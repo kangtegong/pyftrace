@@ -213,9 +213,6 @@ Returning <module>-> None @ /path/to/examples/module_trace/main.py
 
 ### Notes
 - simple-pyftrace.py is a simplified pyftrace script for the [Pycon Korea 2024](https://2024.pycon.kr/) presentation. It is about 100 lines of code, but has limited functionality. 
-- Indentation: The indentation in the output represents the call hierarchy, making it easier to visualize which functions are calling others.
-- Returning Statements: When a function returns, pyftrace logs the return value.
-- File Paths: File paths are absolute paths. You can modify the code to display relative paths if preferred.
 
 ## LICENESE
 
