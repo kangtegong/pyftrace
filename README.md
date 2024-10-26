@@ -4,13 +4,15 @@
 
 **pyftrace** is a lightweight Python function tracing tool designed to monitor and report on function calls within Python scripts. It leverages Python 3.12's built-in monitoring capabilities to provide insights into the execution flow of your programs. With pyftrace, you can trace function calls across multiple modules, visualize call hierarchies, and generate execution time reports.
 
+![pyftrace-demo](assets/pyftrace-demo.gif)
+
 Key features of pyftrace include:
 
 - **Function Call Tracing**: Monitor calls to functions in your script and imported modules.
 - **Built-in Function Tracing**: Optionally trace built-in functions like `print` using the `--verbose` flag.
 - **Multiple Module Support**: Trace functions across multiple files within your project.
 - **Execution Reports**: Generate reports detailing function execution times and call counts with the `--report` flag.
-- **Customizable Output**: Use the `--path` flag to include file paths in tracing output, aiding in debugging and code analysis.
+- **Path Tracing**: Use the `--path` flag to include file paths in tracing output.
 
 ## Usage
 
@@ -19,22 +21,27 @@ Key features of pyftrace include:
 - **Python Version**: pyftrace requires **Python 3.12** or higher due to its use of the new `sys.monitoring` module introduced in Python 3.12.
 
 ```bash
-$ pyftrace [options] script_path
+$ pyftrace [options] /path/to/python/script
 ```
-
-- `script_path`: The path to the Python script you want to trace.
 
 
 ### Installation
 
+```
+$ https://github.com/kangtegong/pyftrace.git
+$ pip install -e .
+```
 
+```
+$ pip install pyftrace
+```
 
 
 ### Command-Line Options
 
 - `--report`: Generate a report of function execution times and call counts at the end of the script's execution.
 - `--verbose`: Enable tracing of built-in functions (e.g., print, len). Without this flag, pyftrace only traces user-defined functions.
-- `--path`: Include file paths in the tracing output. This is particularly useful when working with multiple modules, as it shows where each function is defined and called.
+- `--path`: Include file paths in the tracing output. 
 - `-h` or `--help`: Display help information about pyftrace and its options.
 
 ## Examples
