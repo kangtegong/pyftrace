@@ -1,8 +1,6 @@
-- add some unittests
 - TUI
 - argument tracing
-- trace record, output
 - function filtering: --function/-F <string>
 - depth limit: --depth/-D <int> 
-- output format: -o/--output -O <filename>
+- output format: -o/--output -O <filename> / sqlite dump
 - multiprocessing & multithreading: pid, tid tracing: 
