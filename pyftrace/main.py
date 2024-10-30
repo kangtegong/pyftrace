@@ -1,6 +1,6 @@
 import sys
 import argparse
-from .tracer import SimplePyftrace
+from .tracer import Pyftrace
 from . import __version__
 
 def main():
@@ -32,7 +32,7 @@ def main():
         parser.print_help()
         sys.exit(1)
 
-    tracer = SimplePyftrace(verbose=args.verbose, show_path=args.path)
+    tracer = Pyftrace(verbose=args.verbose, show_path=args.path)
     tracer.report_mode = args.report
 
     tracer.run_python_script(args.script)

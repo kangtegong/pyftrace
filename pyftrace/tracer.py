@@ -4,7 +4,7 @@ import time
 import weakref
 from .utils import get_site_packages_modules, timeit
 
-class SimplePyftrace:
+class Pyftrace:
     def __init__(self, verbose=False, show_path=False):
         self.tool_id = 1
         self.script_name = None
