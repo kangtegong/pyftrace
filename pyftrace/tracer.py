@@ -227,7 +227,7 @@ class Pyftrace:
             print(f"{func_name:<15}\t| {total_time:.6f} seconds\t| {call_count}")
 
     def setup_monitoring(self):
-        sys.monitoring.use_tool_id(self.tool_id, "simple-pyftrace")
+        sys.monitoring.use_tool_id(self.tool_id, "pyftrace")
         sys.monitoring.register_callback(self.tool_id, sys.monitoring.events.CALL, self.monitor_call)
         sys.monitoring.register_callback(self.tool_id, sys.monitoring.events.PY_RETURN, self.monitor_py_return)
         sys.monitoring.register_callback(self.tool_id, sys.monitoring.events.C_RETURN, self.monitor_c_return)
