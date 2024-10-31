@@ -21,3 +21,4 @@ jobs:
     - name: Run tests
       run: |
         python tests/runtests.py
+      continue-on-error: false
