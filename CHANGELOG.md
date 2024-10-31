@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.1.2] - 2024-11-01
+
+### Added
+- GitHub Workflows.
+  - Introduced `push-test.yml` workflow to automatically run tests on every push.
+  - Added `python-publish.yml` workflow for Python package publishing.
+
+### Changed
+- Dynamic Versioning in Tests.
+  - Refactored tests in `runtests.py` to dynamically retrieve the `__version__` from `pyftrace/__init__.py`.
+
+---
+
 ## [0.1.1] - 2024-10-31
 
 ### Added
