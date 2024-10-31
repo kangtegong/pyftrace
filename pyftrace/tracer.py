@@ -195,7 +195,8 @@ class Pyftrace:
 
     @timeit
     def monitor_c_raise(self, code, instruction_offset, callable_obj, arg0):
-        # 이 예제에서는 C_RAISE 이벤트를 처리하지 않지만, 에러 방지를 위해 빈 함수로 구현
+        # sys.monitoring.events.C_RETURN | sys.monitoring.events.C_RAISE
+        # if C_RAISE not set: ValueError: cannot set C_RETURN or C_RAISE events independently
         pass
 
     def run_python_script(self, script_path):
@@ -221,7 +222,7 @@ class Pyftrace:
     def print_report(self):
         print("\nFunction Name\t| Total Execution Time\t| Call Count")
         print("---------------------------------------------------------")
-        # 예: 실행 시간 기준 내림차순 정렬
+        # Sort by execution time in descending order
         sorted_report = sorted(self.execution_report.items(), key=lambda item: item[1][1], reverse=True)
         for func_name, (_, total_time, call_count) in sorted_report:
             print(f"{func_name:<15}\t| {total_time:.6f} seconds\t| {call_count}")
@@ -231,10 +232,10 @@ class Pyftrace:
         sys.monitoring.register_callback(self.tool_id, sys.monitoring.events.CALL, self.monitor_call)
         sys.monitoring.register_callback(self.tool_id, sys.monitoring.events.PY_RETURN, self.monitor_py_return)
         sys.monitoring.register_callback(self.tool_id, sys.monitoring.events.C_RETURN, self.monitor_c_return)
-        sys.monitoring.register_callback(self.tool_id, sys.monitoring.events.C_RAISE, self.monitor_c_raise)  # 추가
+        sys.monitoring.register_callback(self.tool_id, sys.monitoring.events.C_RAISE, self.monitor_c_raise)
         sys.monitoring.set_events(
             self.tool_id,
-            sys.monitoring.events.CALL | sys.monitoring.events.PY_RETURN | sys.monitoring.events.C_RETURN | sys.monitoring.events.C_RAISE  # 수정
+            sys.monitoring.events.CALL | sys.monitoring.events.PY_RETURN | sys.monitoring.events.C_RETURN | sys.monitoring.events.C_RAISE
         )
 
     def cleanup_monitoring(self):
