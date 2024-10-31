@@ -213,6 +213,7 @@ Results: Result from function A, Result from function B"""
 if __name__ == '__main__':
     runner = unittest.TextTestRunner(verbosity=2)
     result = runner.run(unittest.TestLoader().loadTestsFromTestCase(PyftraceTests))
-    if result.wasSuccessful():
+    if not result.wasSuccessful():
+        sys.exit(1)
+    else:
         print("\nPASS")
-
