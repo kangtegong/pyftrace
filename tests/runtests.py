@@ -4,6 +4,10 @@ import sys
 import os
 import re
 
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+from pyftrace import __version__ as pyftrace_version
+
 class PyftraceTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -43,7 +47,8 @@ class PyftraceTests(unittest.TestCase):
         Test '-v' flag for version display.
         """
         result = self.run_pyftrace(['-v'])
-        self.assertIn("pyftrace version 0.1.0", result.stdout)
+        expected_output = f"pyftrace version {pyftrace_version}"
+        self.assertIn(expected_output, result.stdout)
         self.assertEqual(result.returncode, 0)
 
     def test_version_flag_long_version(self):
@@ -51,7 +56,8 @@ class PyftraceTests(unittest.TestCase):
         Test '--version' flag for version display.
         """
         result = self.run_pyftrace(['--version'])
-        self.assertIn("pyftrace version 0.1.0", result.stdout)
+        expected_output = f"pyftrace version {pyftrace_version}"
+        self.assertIn(expected_output, result.stdout)
         self.assertEqual(result.returncode, 0)
 
     def test_help_option_short_h(self):
