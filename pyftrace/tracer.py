@@ -2,14 +2,15 @@ import sys
 import os
 import time
 import weakref
-from .utils import get_site_packages_modules, timeit
+from .utils import get_site_packages_modules, resolve_filename, get_line_number
 
 class Pyftrace:
-    def __init__(self, verbose=False, show_path=False):
+    def __init__(self, verbose=False, show_path=False, report_mode=False):
         self.tool_id = 1
+        self.tool_name = "pyftrace"
         self.script_name = None
         self.script_dir = None
-        self.report_mode = False
+        self.report_mode = report_mode
         self.execution_report = {}
         self.call_stack = []
         self.verbose = verbose
@@ -18,6 +19,20 @@ class Pyftrace:
         self.tracer_dir = os.path.dirname(self.tracer_script)
         self.tracing_started = False
         self.site_packages_modules = get_site_packages_modules()
+
+    def setup_monitoring(self):
+        sys.monitoring.use_tool_id(self.tool_id, "pyftrace")
+        sys.monitoring.register_callback(self.tool_id, sys.monitoring.events.CALL, self.monitor_call)
+        sys.monitoring.register_callback(self.tool_id, sys.monitoring.events.PY_RETURN, self.monitor_py_return)
+        sys.monitoring.register_callback(self.tool_id, sys.monitoring.events.C_RETURN, self.monitor_c_return)
+        sys.monitoring.register_callback(self.tool_id, sys.monitoring.events.C_RAISE, self.monitor_c_raise)
+        sys.monitoring.set_events(
+            self.tool_id,
+            sys.monitoring.events.CALL |
+            sys.monitoring.events.PY_RETURN |
+            sys.monitoring.events.C_RETURN |
+            sys.monitoring.events.C_RAISE
+        )
 
     def current_depth(self):
         return len(self.call_stack)
@@ -34,25 +49,6 @@ class Pyftrace:
         abs_file_name = os.path.abspath(file_name)
         return abs_file_name.startswith(self.tracer_dir)
 
-    def resolve_filename(self, code, callable_obj):
-        filename = ''
-        if code and code.co_filename:
-            filename = code.co_filename
-            if filename.startswith('<frozen ') and filename.endswith('>'):
-                module_name = filename[len('<frozen '):-1]
-                module = sys.modules.get(module_name)
-                if module and hasattr(module, '__file__'):
-                    filename = module.__file__
-        if not filename and callable_obj:
-            if isinstance(callable_obj, weakref.ReferenceType):
-                callable_obj = callable_obj()
-            module_name = getattr(callable_obj, '__module__', None)
-            if module_name:
-                module = sys.modules.get(module_name)
-                if module and hasattr(module, '__file__'):
-                    filename = module.__file__
-        return filename
-
     def get_line_number(self, code, instruction_offset):
         if code is None:
             return 0
@@ -61,7 +57,6 @@ class Pyftrace:
                 return lineno
         return code.co_firstlineno
 
-    @timeit
     def monitor_call(self, code, instruction_offset, callable_obj, arg0):
         if not self.tracing_started:
             if code and os.path.abspath(code.co_filename) == os.path.abspath(self.script_name) and code.co_name == '<module>':
@@ -69,8 +64,8 @@ class Pyftrace:
             else:
                 return
 
-        call_lineno = self.get_line_number(code, instruction_offset)
-        call_filename = self.resolve_filename(code, None)
+        call_lineno = get_line_number(code, instruction_offset)
+        call_filename = resolve_filename(code, None)
 
         if isinstance(callable_obj, weakref.ReferenceType):
             callable_obj = callable_obj()
@@ -88,7 +83,7 @@ class Pyftrace:
             def_filename = os.path.abspath(callable_obj.__code__.co_filename)
             trace_this = self.should_trace(def_filename) or self.verbose
         else:
-            def_filename = self.resolve_filename(None, callable_obj)
+            def_filename = resolve_filename(None, callable_obj)
             if module_name in self.site_packages_modules or is_builtin:
                 trace_this = self.verbose
             else:
@@ -120,7 +115,7 @@ class Pyftrace:
         if not self.tracing_started:
             return
 
-        filename = self.resolve_filename(code, None)
+        filename = resolve_filename(code, None)
         func_name = code.co_name if code else "<unknown>"
 
         if func_name == "<module>" and filename == self.tracer_script:
@@ -130,10 +125,9 @@ class Pyftrace:
 
         if trace_this and not self.is_tracer_code(filename):
             if self.call_stack:
-                stack_func_name, is_builtin = self.call_stack[-1]
+                stack_func_name, _ = self.call_stack[-1]
             else:
                 stack_func_name = "<unknown>"
-                is_builtin = False
 
             indent = "    " * (self.current_depth() - 1)
 
@@ -165,16 +159,15 @@ class Pyftrace:
         func_name = getattr(callable_obj, '__name__', str(callable_obj))
         module_name = getattr(callable_obj, '__module__', None)
         is_builtin = module_name in (None, 'builtins')
-        filename = self.resolve_filename(code, callable_obj)
+        filename = resolve_filename(code, callable_obj)
 
         trace_this = self.verbose and (self.should_trace(filename) or is_builtin)
 
         if trace_this and not self.is_tracer_code(filename):
             if self.call_stack:
-                stack_func_name, is_builtin_flag = self.call_stack[-1]
+                stack_func_name, _  = self.call_stack[-1]
             else:
                 stack_func_name = "<unknown>"
-                is_builtin_flag = True
 
             indent = "    " * (self.current_depth() - 1)
 
@@ -193,7 +186,6 @@ class Pyftrace:
                 if self.call_stack and self.call_stack[-1][0] == func_name:
                     self.call_stack.pop()
 
-    @timeit
     def monitor_c_raise(self, code, instruction_offset, callable_obj, arg0):
         # sys.monitoring.events.C_RETURN | sys.monitoring.events.C_RAISE
         # if C_RAISE not set: ValueError: cannot set C_RETURN or C_RAISE events independently
@@ -226,17 +218,6 @@ class Pyftrace:
         sorted_report = sorted(self.execution_report.items(), key=lambda item: item[1][1], reverse=True)
         for func_name, (_, total_time, call_count) in sorted_report:
             print(f"{func_name:<15}\t| {total_time:.6f} seconds\t| {call_count}")
-
-    def setup_monitoring(self):
-        sys.monitoring.use_tool_id(self.tool_id, "pyftrace")
-        sys.monitoring.register_callback(self.tool_id, sys.monitoring.events.CALL, self.monitor_call)
-        sys.monitoring.register_callback(self.tool_id, sys.monitoring.events.PY_RETURN, self.monitor_py_return)
-        sys.monitoring.register_callback(self.tool_id, sys.monitoring.events.C_RETURN, self.monitor_c_return)
-        sys.monitoring.register_callback(self.tool_id, sys.monitoring.events.C_RAISE, self.monitor_c_raise)
-        sys.monitoring.set_events(
-            self.tool_id,
-            sys.monitoring.events.CALL | sys.monitoring.events.PY_RETURN | sys.monitoring.events.C_RETURN | sys.monitoring.events.C_RAISE
-        )
 
     def cleanup_monitoring(self):
         sys.monitoring.free_tool_id(self.tool_id)

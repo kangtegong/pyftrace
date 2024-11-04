@@ -10,17 +10,16 @@ def main():
     
     parser = argparse.ArgumentParser(
         description=(
-            "pyftrace: Python function call tracing tool.\n\n"
+            "pyftrace: Python function tracing tool.\n\n"
         ),
         formatter_class=argparse.RawTextHelpFormatter
     )
     
     parser.add_argument('-v', '--version', action='store_true', help="Show the version of pyftrace and exit")
-
-    parser.add_argument('script', nargs='?', help="Path to the Python script to run and trace")
-    parser.add_argument('-V', '--verbose',action='store_true', help="Enable built-in and third-party function tracing")
+    parser.add_argument('-V', '--verbose', action='store_true', help="Enable built-in and third-party function tracing")
     parser.add_argument('-p', '--path', action='store_true', help="Show file paths in tracing output")
     parser.add_argument('-r', '--report', action='store_true', help="Generate a report of function execution times")
+    parser.add_argument('script', nargs='?', help="Path to the Python script to run and trace")
 
     args = parser.parse_args()
 
@@ -32,13 +31,12 @@ def main():
         parser.print_help()
         sys.exit(1)
 
-    tracer = Pyftrace(verbose=args.verbose, show_path=args.path)
-    tracer.report_mode = args.report
-
+    tracer = Pyftrace(verbose=args.verbose, show_path=args.path, report_mode=args.report)
     tracer.run_python_script(args.script)
 
     if tracer.report_mode:
         tracer.print_report()
+        sys.exit(0)
 
 if __name__ == "__main__":
     main()
