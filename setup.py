@@ -3,14 +3,10 @@ import os
 import sys
 
 def get_version():
-    here = os.path.abspath(os.path.dirname(__file__))
-    init_path = os.path.join(here, 'pyftrace', '__init__.py')
-    with open(init_path, 'r') as f:
+    with open(os.path.join(os.path.abspath(os.path.dirname(__file__)), 'pyftrace', '__init__.py'), 'r') as f:
         for line in f:
             if line.startswith('__version__'):
-                delim = '"' if '"' in line else "'"
-                version = line.split(delim)[1]
-                return version
+                return line.split('"' if '"' in line else "'")[1]
     raise RuntimeError("Unable to find version string.")
 
 setup(
