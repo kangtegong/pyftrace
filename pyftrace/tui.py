@@ -92,7 +92,7 @@ def tui_main(stdscr, trace_lines):
         detail_window.refresh()
 
         # Add instruction text (just above the bottom)
-        instruction_text = "↑/↓: Scroll | ←/→: Horizontal Scroll | q: Quit"
+        instruction_text = "↑/↓: Scroll | PgUp/PgDn: Page Scroll | Home/End: Jump | ←/→: Horizontal Scroll | q: Quit"
         # Truncate text if it exceeds the window width
         max_instruction_length = width - 4  # 1 margin on each side
         if len(instruction_text) > max_instruction_length:
@@ -279,15 +279,31 @@ def tui_main(stdscr, trace_lines):
                     # Scroll down if necessary
                     if selected_line >= current_line + display_height:
                         current_line += 1
+            elif key == curses.KEY_PPAGE:  # Page Up
+                if selected_line > 0:
+                    selected_line = max(0, selected_line - display_height)
+                    current_line = max(0, current_line - display_height)
+            elif key == curses.KEY_NPAGE:  # Page Down
+                if selected_line < max_line - 1:
+                    selected_line = min(max_line - 1, selected_line + display_height)
+                    current_line = min(max_line - display_height, current_line + display_height)
+            elif key == curses.KEY_HOME:  # Home
+                selected_line = 0
+                current_line = 0
+            elif key == curses.KEY_END:  # End
+                selected_line = max_line - 1
+                current_line = max_line - display_height
+                if current_line < 0:
+                    current_line = 0
             elif key == curses.KEY_LEFT:
                 if current_col > 0:
                     current_col -= 5  # Adjust scroll unit
                     if current_col < 0:
                         current_col = 0
             elif key == curses.KEY_RIGHT:
-                # Set scroll limit based on length of the selected line
-                selected_simplified_line = simplified_lines[selected_line]
-                if current_col + display_width < len(selected_simplified_line):
+                # Set scroll limit based on length of the longest line
+                max_line_length = max(len(line) for line in simplified_lines)
+                if current_col + display_width < max_line_length:
                     current_col += 5  # Adjust scroll unit
             elif key == ord('q') or key == ord('Q'):
                 break
