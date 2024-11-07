@@ -5,7 +5,7 @@ import weakref
 from .utils import get_site_packages_modules, resolve_filename, get_line_number
 
 class Pyftrace:
-    def __init__(self, verbose=False, show_path=False, report_mode=False):
+    def __init__(self, verbose=False, show_path=False, report_mode=False, output_stream=sys.stdout):
         self.tool_id = 1
         self.tool_name = "pyftrace"
         self.script_name = None
@@ -19,6 +19,7 @@ class Pyftrace:
         self.tracer_dir = os.path.dirname(self.tracer_script)
         self.tracing_started = False
         self.site_packages_modules = get_site_packages_modules()
+        self.output_stream = output_stream
 
     def setup_monitoring(self):
         sys.monitoring.use_tool_id(self.tool_id, "pyftrace")
@@ -100,8 +101,8 @@ class Pyftrace:
             else:
                 func_location = func_name
                 call_location = f"from line {call_lineno}"
-            if not self.report_mode:
-                print(f"{indent}Called {func_location} {call_location}")
+            if not self.report_mode and self.output_stream:
+                print(f"{indent}Called {func_location} {call_location}", file=self.output_stream)
             self.call_stack.append((func_name, is_builtin))
             if self.report_mode:
                 start_time = time.time()
@@ -138,8 +139,8 @@ class Pyftrace:
 
             if func_name != "<module>":
                 if stack_func_name == func_name:
-                    if not self.report_mode:
-                        print(f"{indent}Returning {func_name}-> {retval}{file_info}")
+                    if not self.report_mode and self.output_stream:
+                        print(f"{indent}Returning {func_name}-> {retval}{file_info}", file=self.output_stream)
 
                     if self.report_mode and func_name in self.execution_report:
                         start_time, total_time, call_count = self.execution_report[func_name]
@@ -149,8 +150,8 @@ class Pyftrace:
                     if self.call_stack and self.call_stack[-1][0] == func_name:
                         self.call_stack.pop()
             else:
-                if not self.report_mode:
-                    print(f"{indent}Returning {func_name}-> {retval}{file_info}")
+                if not self.report_mode and self.output_stream:
+                    print(f"{indent}Returning {func_name}-> {retval}{file_info}", file=self.output_stream)
 
     def monitor_c_return(self, code, instruction_offset, callable_obj, arg0):
         if not self.tracing_started:
@@ -165,7 +166,7 @@ class Pyftrace:
 
         if trace_this and not self.is_tracer_code(filename):
             if self.call_stack:
-                stack_func_name, _  = self.call_stack[-1]
+                stack_func_name, _ = self.call_stack[-1]
             else:
                 stack_func_name = "<unknown>"
 
@@ -177,8 +178,8 @@ class Pyftrace:
                 file_info = ""
 
             if stack_func_name == func_name:
-                if not self.report_mode:
-                    print(f"{indent}Returning {func_name}{file_info}")
+                if not self.report_mode and self.output_stream:
+                    print(f"{indent}Returning {func_name}{file_info}", file=self.output_stream)
                 if self.report_mode and func_name in self.execution_report:
                     start_time, total_time, call_count = self.execution_report[func_name]
                     exec_time = time.time() - start_time
@@ -192,7 +193,9 @@ class Pyftrace:
         pass
 
     def run_python_script(self, script_path):
-        print(f"Running script: {script_path}")
+        if self.output_stream:
+            print(f"Running script: {script_path}", file=self.output_stream)
+
         self.script_name = script_path
         self.script_dir = os.path.dirname(os.path.abspath(script_path))
 
@@ -208,8 +211,8 @@ class Pyftrace:
         try:
             exec(code_object, {"__file__": script_path, "__name__": "__main__"})
         finally:
-            sys.path = old_sys_path
             self.cleanup_monitoring()
+            sys.path = old_sys_path
 
     def print_report(self):
         print("\nFunction Name\t| Total Execution Time\t| Call Count")
@@ -220,5 +223,6 @@ class Pyftrace:
             print(f"{func_name:<15}\t| {total_time:.6f} seconds\t| {call_count}")
 
     def cleanup_monitoring(self):
+        self.output_stream = None
         sys.monitoring.free_tool_id(self.tool_id)
 

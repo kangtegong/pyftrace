@@ -1,42 +1,68 @@
 import sys
 import argparse
 from .tracer import Pyftrace
+from .tui import run_tui
 from . import __version__
+import tempfile
+import os
 
 def main():
     if sys.version_info < (3, 12):
         print("This tracer requires Python 3.12 or higher.")
         sys.exit(1)
-    
+
     parser = argparse.ArgumentParser(
-        description=(
-            "pyftrace: Python function tracing tool.\n\n"
-        ),
+        usage="%(prog)s [options] [tui] script",
+        description="pyftrace: Python function tracing tool.",
         formatter_class=argparse.RawTextHelpFormatter
     )
-    
-    parser.add_argument('-v', '--version', action='store_true', help="Show the version of pyftrace and exit")
+
+    parser.add_argument('-v', '--version', action='version', version=f'pyftrace version {__version__}', help="Show the version of pyftrace and exit")
     parser.add_argument('-V', '--verbose', action='store_true', help="Enable built-in and third-party function tracing")
     parser.add_argument('-p', '--path', action='store_true', help="Show file paths in tracing output")
     parser.add_argument('-r', '--report', action='store_true', help="Generate a report of function execution times")
-    parser.add_argument('script', nargs='?', help="Path to the Python script to run and trace")
+
+    parser.add_argument('script', nargs='+', help="Path to the script to run and trace. Specify 'tui' before the script path to run in TUI mode.")
 
     args = parser.parse_args()
 
-    if args.version:
-        print(f"pyftrace version {__version__}")
-        sys.exit(0)
+    is_tui_mode = False
+    script_path = None
 
-    if not args.script:
-        parser.print_help()
+    if args.script[0] == 'tui':
+        is_tui_mode = True
+        if len(args.script) < 2:
+            print("Error: Please specify a script to run in TUI mode.")
+            sys.exit(1)
+        script_path = args.script[1]
+    else:
+        script_path = args.script[0]
+
+    if not os.path.isfile(script_path):
+        print(f"Error: Script '{script_path}' does not exist.")
         sys.exit(1)
 
-    tracer = Pyftrace(verbose=args.verbose, show_path=args.path, report_mode=args.report)
-    tracer.run_python_script(args.script)
+    if is_tui_mode:
+        with tempfile.NamedTemporaryFile(mode="w+", delete=False) as temp_file:
+            temp_file_path = temp_file.name
 
-    if tracer.report_mode:
-        tracer.print_report()
-        sys.exit(0)
+        try:
+            with open(temp_file_path, "w") as f:
+                tracer = Pyftrace(verbose=args.verbose, show_path=args.path, output_stream=f)
+                tracer.run_python_script(script_path)
+
+            run_tui(temp_file_path)
+
+        finally:
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+    else:
+        tracer = Pyftrace(verbose=args.verbose, show_path=args.path, report_mode=args.report)
+        tracer.run_python_script(script_path)
+
+        if tracer.report_mode:
+            tracer.print_report()
+            sys.exit(0)
 
 if __name__ == "__main__":
     main()

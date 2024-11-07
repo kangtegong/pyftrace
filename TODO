@@ -1,4 +1,3 @@
-- TUI
 - argument tracing
 - function filtering: --function/-F <string>
 - depth limit: --depth/-D <int> 
