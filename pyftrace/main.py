@@ -12,7 +12,7 @@ def main():
         sys.exit(1)
 
     parser = argparse.ArgumentParser(
-        usage="%(prog)s [options] [tui] script",
+        usage="%(prog)s [options] [tui] script [script_args ...]",
         description="pyftrace: Python function tracing tool.",
         formatter_class=argparse.RawTextHelpFormatter
     )
@@ -28,6 +28,7 @@ def main():
 
     is_tui_mode = False
     script_path = None
+    script_args = []
 
     if args.script[0] == 'tui':
         is_tui_mode = True
@@ -35,8 +36,10 @@ def main():
             print("Error: Please specify a script to run in TUI mode.")
             sys.exit(1)
         script_path = args.script[1]
+        script_args = args.script[2:]
     else:
         script_path = args.script[0]
+        script_args = args.script[1:]
 
     if not os.path.isfile(script_path):
         print(f"Error: Script '{script_path}' does not exist.")
@@ -49,8 +52,7 @@ def main():
         try:
             with open(temp_file_path, "w") as f:
                 tracer = Pyftrace(verbose=args.verbose, show_path=args.path, output_stream=f)
-                tracer.run_python_script(script_path)
-
+                tracer.run_python_script(script_path, script_args)
             run_tui(temp_file_path)
 
         finally:
@@ -58,7 +60,7 @@ def main():
                 os.remove(temp_file_path)
     else:
         tracer = Pyftrace(verbose=args.verbose, show_path=args.path, report_mode=args.report)
-        tracer.run_python_script(script_path)
+        tracer.run_python_script(script_path, script_args)
 
         if tracer.report_mode:
             tracer.print_report()

@@ -192,7 +192,7 @@ class Pyftrace:
         # if C_RAISE not set: ValueError: cannot set C_RETURN or C_RAISE events independently
         pass
 
-    def run_python_script(self, script_path):
+    def run_python_script(self, script_path, script_args):
         if self.output_stream:
             print(f"Running script: {script_path}", file=self.output_stream)
 
@@ -204,7 +204,9 @@ class Pyftrace:
             code_object = compile(script_code, script_path, 'exec')
 
         old_sys_path = sys.path.copy()
+        old_sys_argv = sys.argv.copy()
         sys.path.insert(0, self.script_dir)
+        sys.argv = [script_path] + script_args
 
         self.setup_monitoring()
 
@@ -213,6 +215,7 @@ class Pyftrace:
         finally:
             self.cleanup_monitoring()
             sys.path = old_sys_path
+            sys.argv = old_sys_argv
 
     def print_report(self):
         print("\nFunction Name\t| Total Execution Time\t| Call Count")
