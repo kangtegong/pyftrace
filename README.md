@@ -1,3 +1,6 @@
+![push-test](https://github.com/kangtegong/pyftrace/actions/workflows/push-test.yml/badge.svg)
+![pypi-publish](https://github.com/kangtegong/pyftrace/actions/workflows/python-publish.yml/badge.svg)
+
 # pyftrace
 
 ## Introduction
