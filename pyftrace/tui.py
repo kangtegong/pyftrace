@@ -1,7 +1,7 @@
 import curses
 import sys
 import re
-import logging
+# import logging
 import os
 
 def run_tui(trace_file_path):
@@ -15,9 +15,8 @@ def run_tui(trace_file_path):
     curses.wrapper(tui_main, trace_lines)
 
 def tui_main(stdscr, trace_lines):
-    # Set up logging
-    logging.basicConfig(filename='tui_debug.log', level=logging.DEBUG,
-                        format='%(asctime)s - %(levelname)s - %(message)s')
+    # logging.basicConfig(filename='tui_debug.log', level=logging.DEBUG,
+    #                     format='%(asctime)s - %(levelname)s - %(message)s')
 
     try:
         # Initialize
@@ -48,8 +47,7 @@ def tui_main(stdscr, trace_lines):
                 curses.init_pair(4, curses.COLOR_GREEN, 236)    # Function Detail text (256-color)
                 curses.init_pair(5, curses.COLOR_BLUE, 236)     # Instruction text (256-color)
             except curses.error as e:
-                logging.error(f"Error initializing 256-color pairs: {e}")
-                # Fallback to 8-color if initialization fails
+                # logging.error(f"Error initializing 256-color pairs: {e}")
                 supports_256_colors = False
 
         if not supports_256_colors:
@@ -105,8 +103,8 @@ def tui_main(stdscr, trace_lines):
         stdscr.attron(INSTRUCTION_COLOR | curses.A_BOLD)
         try:
             stdscr.addnstr(height - 2, 1, instruction_text.ljust(width - 2), width - 2)
-        except curses.error as e:
-            logging.error(f"Error adding instruction text on stdscr: {e}")
+        except curses.error:
+            pass
         stdscr.attroff(INSTRUCTION_COLOR | curses.A_BOLD)
         stdscr.refresh()
 
@@ -168,7 +166,8 @@ def tui_main(stdscr, trace_lines):
                     "file_path": file_path,
                 }
             else:
-                logging.warning(f"Failed to parse line: '{line}'")
+                # logging.warning(f"Failed to parse line: '{line}'")
+                pass
             return None
 
         def simplify_trace_line(line):
@@ -218,9 +217,8 @@ def tui_main(stdscr, trace_lines):
                         display_window.addnstr(idx, 0, visible_line, display_width, HIGHLIGHT_COLOR)
                     else:
                         display_window.addnstr(idx, 0, visible_line, display_width, NORMAL_COLOR)
-                except curses.error as e:
-                    logging.error(f"Error adding line {line_num} to display_window: {e}")
-                    pass  # Ignore if exceeding window boundaries
+                except curses.error:
+                    pass
 
             display_window.noutrefresh()
 
