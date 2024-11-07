@@ -1,5 +1,11 @@
-- argument tracing
-- function filtering: --function/-F <string>
+- trace format using ├, │, ─ 
+- tui: 'page up', 'page down', 'home', 'end'
+- tui: fold/unfold
+- tui: '/' (search function)
+- function filtering: --function/-f <string>
+- function-exclude filtering: --exclude-function/-e <string>
 - depth limit: --depth/-D <int> 
 - output format: -o/--output -O <filename> / sqlite dump
-- multiprocessing & multithreading: pid, tid tracing: 
+- multiprocessing(pid) & multithreading(tid) tracing
+- argument tracing
+
