@@ -66,7 +66,7 @@ class PyftraceTests(unittest.TestCase):
         """
         result = self.run_pyftrace(['-h'])
         self.assertIn("usage:", result.stdout)
-        self.assertIn("pyftrace: Python function call tracing tool.", result.stdout)
+        self.assertIn("pyftrace: Python function tracing tool.", result.stdout)
         self.assertEqual(result.returncode, 0)
 
     def test_help_option_long_help(self):
@@ -75,7 +75,7 @@ class PyftraceTests(unittest.TestCase):
         """
         result = self.run_pyftrace(['--help'])
         self.assertIn("usage:", result.stdout)
-        self.assertIn("pyftrace: Python function call tracing tool.", result.stdout)
+        self.assertIn("pyftrace: Python function tracing tool.", result.stdout)
         self.assertEqual(result.returncode, 0)
 
     def test_tracing_script_default(self):
