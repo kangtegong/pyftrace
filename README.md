@@ -31,13 +31,18 @@ $ pyftrace [options] /path/to/python/script
 ### Installation
 
 ```
-$ https://github.com/kangtegong/pyftrace.git
+$ git clone https://github.com/kangtegong/pyftrace.git
+$ cd pyftrace
 $ pip install -e .
 ```
+
+or
 
 ```
 $ pip install pyftrace
 ```
+
+> note: on Windows, windows-curses is required.
 
 
 ### Command-Line Options
