@@ -1,6 +1,7 @@
 import sys
 import os
 import weakref
+import dis
 
 def get_site_packages_modules():
     site_packages_dirs = [d for d in sys.path if 'site-packages' in d]
@@ -36,8 +37,18 @@ def resolve_filename(code, callable_obj):
 def get_line_number(code, instruction_offset):
     if code is None:
         return 0
-    for start, end, lineno in code.co_lines():
-        if start <= instruction_offset < end:
-            return lineno
-    return code.co_firstlineno
+    if hasattr(code, 'co_lines'):
+        # Python >=  3.10
+        for start, end, lineno in code.co_lines():
+            if start <= instruction_offset < end:
+                return lineno
+        return code.co_firstlineno
+    else:
+        # Python <= 3.9
+        line_num = code.co_firstlineno
+        for byte_offset, lineno in dis.findlinestarts(code):
+            if byte_offset > instruction_offset:
+                break
+            line_num = lineno
+        return line_num
 
