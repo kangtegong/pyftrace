@@ -3,6 +3,7 @@ import sys
 import re
 # import logging
 import os
+import platform
 
 def run_tui(trace_file_path):
     if not os.path.isfile(trace_file_path):
@@ -119,19 +120,38 @@ def tui_main(stdscr, trace_lines):
 
         current_col = 0  # Horizontal scroll offset
 
-        BUILTIN_FUNCTIONS = ["print"]  # Add built-in functions as needed
 
         def parse_trace_line(line):
-            # Pattern for function call lines
-            call_match = re.match(
-                r'(?P<indent>\s*)Called\s+(?P<func_name>[<>?\w]+)(?:@\s*(?P<def_path>[^:]+)(?::(?P<def_line>\d+))?)?\s+from\s+(?P<call_path>[^:]+):(?P<call_line>\d+)',
-                line
-            )
-            # Pattern for function return lines
-            return_match = re.match(
-                r'(?P<indent>\s*)Returning\s+(?P<func_name>[<>?\w]+)(?:->\s*(?P<retval>.*?))?(?:\s*@\s*(?P<file_path>.+))?$',
-                line
-            )
+            is_windows = platform.system() == 'Windows'
+
+            if is_windows:
+                # for windows
+                call_match = re.match(
+                    r'(?P<indent>\s*)Called\s+(?P<func_name>[<>?\w]+)'
+                    r'\s*@\s*(?P<def_path>.+?)(?::(?P<def_line>\d+))?'
+                    r'\s+from\s+(?P<call_path>.+?):(?P<call_line>\d+)',
+                    line
+                )
+                return_match = re.match(
+                    r'(?P<indent>\s*)Returning\s+(?P<func_name>[<>?\w]+)'
+                    r'(?:\s*->\s*(?P<retval>[^@]+))?'
+                    r'(?:\s*@\s*(?P<file_path>.+))?$',
+                    line
+                )
+            else:
+                # for macOS, Linux
+                call_match = re.match(
+                    r'(?P<indent>\s*)Called\s+(?P<func_name>[<>?\w]+)'
+                    r'\s*@\s*(?P<def_path>[^:]+)(?::(?P<def_line>\d+))?'
+                    r'\s+from\s+(?P<call_path>[^:]+):(?P<call_line>\d+)',
+                    line
+                )
+                return_match = re.match(
+                    r'(?P<indent>\s*)Returning\s+(?P<func_name>[<>?\w]+)'
+                    r'(?:\s*->\s*(?P<retval>[^@]+))?'
+                    r'(?:\s*@\s*(?P<file_path>[^@]+))?$',
+                    line
+                )
 
             if call_match:
                 func_name = call_match.group("func_name")
@@ -139,9 +159,7 @@ def tui_main(stdscr, trace_lines):
                 def_line = call_match.group("def_line") if call_match.group("def_line") else ""
                 call_path = call_match.group("call_path")
                 call_line = call_match.group("call_line")
-                if func_name in BUILTIN_FUNCTIONS:
-                    def_path = "built-in"
-                    def_line = ""
+
                 return {
                     "type": "call",
                     "func_name": func_name,
@@ -155,9 +173,6 @@ def tui_main(stdscr, trace_lines):
                 retval = return_match.group("retval").strip() if return_match.group("retval") else ""
                 file_path = return_match.group("file_path").strip() if return_match.group("file_path") else ""
 
-                # If built-in function
-                if func_name in BUILTIN_FUNCTIONS:
-                    file_path = "built-in"
 
                 return {
                     "type": "return",
@@ -251,7 +266,7 @@ def tui_main(stdscr, trace_lines):
 
                         detail_window.addstr(1, 2, f"[ Function Name ] {func_name}", DETAIL_COLOR)
                         # Do not display retval if it's a built-in function
-                        if func_name not in BUILTIN_FUNCTIONS and retval:
+                        if retval:
                             detail_window.addstr(2, 2, f"[ Return Value ] {retval}", DETAIL_COLOR)
                         if file_path:
                             detail_window.addstr(3, 2, f"[ Returned From ] {file_path}", DETAIL_COLOR)
