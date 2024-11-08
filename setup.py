@@ -24,6 +24,10 @@ setup(
             "pyftrace=pyftrace.main:main",
         ],
     },
+    install_requires=[
+    ],
+    extras_require={
+        ":sys_platform == 'win32'": ["windows-curses"]
+    },
     python_requires=">=3.12",
 )
-
