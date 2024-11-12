@@ -1,5 +1,4 @@
 - trace format using ├, │, ─ 
-- tui: 'page up', 'page down', 'home', 'end'
 - tui: fold/unfold
 - tui: '/' (search function)
 - function filtering: --function/-f <string>
