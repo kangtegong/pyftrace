@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.2.0] - 2024-11-11
+
+### Added
+- TUI support start!
+  - Added `tui.py` using `curses` for terminal-based UI.
+  - Supports Page Up, Page Down, Home, and End keys for scrolling through trace data.
+  - New example script `examples/recursives.py` for testing deep trace depth in TUI.
+- Argument handling for traced scripts:
+  - `pyftrace` now supports passing additional arguments to traced scripts in both CLI and TUI modes.
+- Cross-platform testing on GitHub Actions:
+  - Added workflows for testing on Ubuntu, Windows, and macOS.
+
+### Changed
+- Swapped short options for `verbose` and `version` flags:
+  - `verbose` now uses `-v` (lowercase), and `version` uses `-V` (uppercase).
+- Documentation updates:
+  - README workflow status badges.
+  - README Installation instructions for Windows users (noting `windows-curses`).
+
+### Fixed
+- Function call parsing logic updated for Windows to handle backslashes in paths.
+
 ## [0.1.2] - 2024-11-01
 
 ### Added
