@@ -278,6 +278,29 @@ def tui_main(stdscr, trace_lines):
                 detail_window.noutrefresh()
                 previous_selected_line = selected_line
 
+            # Update instruction line with percentage after key press
+            percentage = ((selected_line + 1) / max_line) * 100 if max_line > 0 else 0
+            percentage_text = f"{percentage:.2f}% ({selected_line + 1}/{max_line})"
+            instruction_line = instruction_text
+
+            # Truncate or pad instruction text if necessary
+            max_instruction_length = width - len(percentage_text) - 4  # 4 extra spaces
+            if len(instruction_line) > max_instruction_length:
+                instruction_line = instruction_line[:max_instruction_length - 3] + "..."
+            else:
+                instruction_line = instruction_line.ljust(max_instruction_length)
+
+            # Combine instruction text and percentage text
+            full_instruction = instruction_line + "  " + percentage_text
+
+            # Draw instruction line
+            stdscr.attron(INSTRUCTION_COLOR | curses.A_BOLD)
+            try:
+                stdscr.addnstr(height - 2, 1, full_instruction, width - 2)
+            except curses.error:
+                pass
+            stdscr.attroff(INSTRUCTION_COLOR | curses.A_BOLD)
+
             curses.doupdate()
 
             key = stdscr.getch()
