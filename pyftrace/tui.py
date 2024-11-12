@@ -325,6 +325,8 @@ def tui_main(stdscr, trace_lines):
                 if selected_line < max_line - 1:
                     selected_line = min(max_line - 1, selected_line + display_height)
                     current_line = min(max_line - display_height, current_line + display_height)
+                    if current_line < 0:
+                        current_line = 0
             elif key == curses.KEY_HOME:  # Home
                 selected_line = 0
                 current_line = 0
@@ -340,11 +342,15 @@ def tui_main(stdscr, trace_lines):
                         current_col = 0
             elif key == curses.KEY_RIGHT:
                 # Set scroll limit based on length of the longest line
-                max_line_length = max(len(line) for line in simplified_lines)
+                max_line_length = max(len(line) for line in simplified_lines) if simplified_lines else 0
                 if current_col + display_width < max_line_length:
                     current_col += 5  # Adjust scroll unit
             elif key == ord('q') or key == ord('Q'):
                 break
+
+            if max_line > 0:
+                selected_line = max(0, min(selected_line, max_line - 1))
+                current_line = max(0, min(current_line, max(max_line - display_height, 0)))
 
     finally:
         # Restore settings upon program exit
