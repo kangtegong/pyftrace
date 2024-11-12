@@ -17,8 +17,8 @@ def main():
         formatter_class=argparse.RawTextHelpFormatter
     )
 
-    parser.add_argument('-v', '--version', action='version', version=f'pyftrace version {__version__}', help="Show the version of pyftrace and exit")
-    parser.add_argument('-V', '--verbose', action='store_true', help="Enable built-in and third-party function tracing")
+    parser.add_argument('-V', '--version', action='version', version=f'pyftrace version {__version__}', help="Show the version of pyftrace and exit")
+    parser.add_argument('-v', '--verbose', action='store_true', help="Enable built-in and third-party function tracing")
     parser.add_argument('-p', '--path', action='store_true', help="Show file paths in tracing output")
     parser.add_argument('-r', '--report', action='store_true', help="Generate a report of function execution times")
 
