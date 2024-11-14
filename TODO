@@ -1,3 +1,7 @@
+- add -vv option for large codebase (e.g. Django, Pytorch, etc)
+  - -v option: Additionally enable built-in functions tracing
+  - -vv option: Additionally enable stdlib tracing 
+    - stdlib path: sysconfig.get_paths()["stdlib"]
 - trace format using ├, │, ─ 
 - tui: fold/unfold
 - tui: '/' (search function)
@@ -7,4 +11,3 @@
 - output format: -o/--output -O <filename> / sqlite dump
 - multiprocessing(pid) & multithreading(tid) tracing
 - argument tracing
-
