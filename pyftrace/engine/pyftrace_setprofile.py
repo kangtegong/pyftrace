@@ -3,7 +3,7 @@ import os
 import time
 import sysconfig
 from ..pyftrace_base import PyftraceBase
-from ..utils import get_site_packages_modules, resolve_filename, get_line_number
+from ..utils import resolve_filename, get_line_number
 
 class PyftraceSetprofile(PyftraceBase):
     """
@@ -140,7 +140,8 @@ class PyftraceSetprofile(PyftraceBase):
             if not self.report_mode and self.output_stream:
                 print(f"{indent}Called {func_location} {call_location}", file=self.output_stream)
 
-            self.call_stack.append((frame, func_name, filename))
+            # Store function name instead of frame
+            self.call_stack.append(func_name)
 
             if self.report_mode:
                 start_time = time.time()
@@ -163,7 +164,7 @@ class PyftraceSetprofile(PyftraceBase):
         if filename.startswith(self.tracer_dir):
             return
 
-        # Skip tracing '<module>' 
+        # Skip tracing '<module>'
         if func_name == '<module>':
             return
 
@@ -173,11 +174,12 @@ class PyftraceSetprofile(PyftraceBase):
 
         trace_this = False
 
-        if self.call_stack and self.call_stack[-1][0] == frame:
+        # Compare function names instead of frames
+        if self.call_stack and self.call_stack[-1] == func_name:
             trace_this = True
 
         if trace_this:
-            stack_frame, func_name, filename = self.call_stack.pop()
+            func_name = self.call_stack.pop()
 
             indent = "    " * self.current_depth()
 
@@ -188,7 +190,7 @@ class PyftraceSetprofile(PyftraceBase):
 
             if not self.report_mode and self.output_stream:
                 return_value = ''
-                if not is_c_return and arg is not None:
+                if not is_c_return:
                     return_value = f"-> {arg}"
                 print(f"{indent}Returning {func_name}{return_value}{file_info}", file=self.output_stream)
 
