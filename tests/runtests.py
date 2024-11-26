@@ -95,8 +95,7 @@ Function A is called.
 Function B is called.
     Returning function_b-> ret_b
 Results: ret_a, ret_b
-Returning main-> None
-Returning <module>-> None"""
+Returning main-> None"""
 
         # Normalize line endings and strip trailing whitespace
         expected_output = expected_output.replace('\r\n', '\n').strip()
@@ -129,8 +128,7 @@ Function B is called.
     Called print from line 7
 Results: ret_a, ret_b
     Returning print
-Returning main-> None
-Returning <module>-> None"""
+Returning main-> None"""
 
         # Normalize line endings and strip trailing whitespace
         expected_output = expected_output.replace('\r\n', '\n').strip()
@@ -158,8 +156,7 @@ Function A is called.
 Function B is called.
     Returning function_b-> ret_b @ {self.module_b}
 Results: ret_a, ret_b
-Returning main-> None @ {self.main_script}
-Returning <module>-> None @ {self.main_script}"""
+Returning main-> None @ {self.main_script}"""
 
         # Normalize line endings and strip trailing whitespace
         expected_output = expected_output.replace('\r\n', '\n').strip()

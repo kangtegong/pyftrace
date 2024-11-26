@@ -7,8 +7,8 @@ import tempfile
 import os
 
 def main():
-    if sys.version_info < (3, 12):
-        print("This tracer requires Python 3.12 or higher.")
+    if sys.version_info < (3, 10):
+        print("This tracer requires Python 3.10 or higher.")
         sys.exit(1)
 
     parser = argparse.ArgumentParser(

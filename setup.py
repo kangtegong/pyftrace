@@ -29,5 +29,5 @@ setup(
     extras_require={
         ":sys_platform == 'win32'": ["windows-curses"]
     },
-    python_requires=">=3.12",
+    python_requires=">=3.10",
 )
