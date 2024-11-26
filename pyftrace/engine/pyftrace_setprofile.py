@@ -69,46 +69,48 @@ class PyftraceSetprofile(PyftraceBase):
             pass
 
     def handle_call_event(self, frame, arg, is_c_call=False):
-        code = frame.f_code if not is_c_call else None
-        func_name = code.co_name if code else arg.__name__
-        filename = resolve_filename(code, None) if code else resolve_filename(None, arg)
+        if is_c_call:
+            # Get the '__name__' attribute of 'arg', or use str(arg) if '__name__' is not present
+            func_name = getattr(arg, '__name__', str(arg))
+            # Retrieve the '__module__' attribute of 'arg', or use '' if it's not available
+            module_name = getattr(arg, '__module__', '') or ''
+            code = None
+            filename = None
+            caller_frame = frame
+        else:
+            code = frame.f_code
+            func_name = code.co_name
+            # Retrieve the module's name from frame's globals, defaulting to '' if not available
+            module_name = frame.f_globals.get('__name__', '') or ''
+            filename = resolve_filename(code, None)
+            caller_frame = frame.f_back
+
         if filename:
             filename = os.path.abspath(filename)
 
-        if filename.startswith(self.tracer_dir):
+        if filename and filename.startswith(self.tracer_dir):
             return
 
-        # Start tracing when entering the script's code after imports
         if not self.tracing_started:
             if filename == self.script_name and frame.f_lineno > self.import_end_line:
                 self.tracing_started = True
             else:
                 return
 
-        # After tracing has started, skip tracing the '<module>' function
         if func_name == '<module>':
             return
 
-        # Exclude stdlib and frozen modules
-        if self.is_stdlib_code(filename):
-            return
-
         trace_this = False
-        module_name = frame.f_globals.get('__name__', None) if frame.f_globals else None
 
-        if (is_c_call or module_name == 'builtins') and self.verbose:
-            caller_frame = frame.f_back
-            caller_filename = resolve_filename(caller_frame.f_code, None) if caller_frame else None
-            if caller_filename:
-                caller_filename = os.path.abspath(caller_filename)
-                if self.should_trace(caller_filename):
-                    trace_this = True
-        else:
-            if self.should_trace(filename):
+        if self.is_stdlib_code(filename):
+            if not (self.verbose and module_name == 'builtins'):
+                return
+
+        if self.should_trace(filename):
+            trace_this = True
+        elif self.verbose:
+            if module_name == 'builtins':
                 trace_this = True
-            elif self.verbose:
-                if not self.is_stdlib_code(filename):
-                    trace_this = True
 
         if trace_this:
             indent = "    " * self.current_depth()
@@ -118,21 +120,26 @@ class PyftraceSetprofile(PyftraceBase):
             else:
                 func_def_lineno = ''
 
-            caller_frame = frame.f_back
-            call_lineno = ''
-            call_filename = ''
             if caller_frame:
-                call_lineno = get_line_number(caller_frame.f_code, caller_frame.f_lasti)
+                call_lineno = caller_frame.f_lineno
                 call_filename = resolve_filename(caller_frame.f_code, None)
                 if call_filename:
                     call_filename = os.path.abspath(call_filename)
+            else:
+                call_lineno = ''
+                call_filename = ''
 
             if self.show_path:
                 if func_def_lineno:
                     func_location = f"{func_name}@{filename}:{func_def_lineno}"
-                else:
+                elif filename:
                     func_location = f"{func_name}@{filename}"
-                call_location = f"from {call_filename}:{call_lineno}"
+                else:
+                    func_location = func_name
+                if call_filename and call_lineno:
+                    call_location = f"from {call_filename}:{call_lineno}"
+                else:
+                    call_location = f"from line {call_lineno}"
             else:
                 func_location = func_name
                 call_location = f"from line {call_lineno}"
@@ -140,7 +147,6 @@ class PyftraceSetprofile(PyftraceBase):
             if not self.report_mode and self.output_stream:
                 print(f"{indent}Called {func_location} {call_location}", file=self.output_stream)
 
-            # Store function name instead of frame
             self.call_stack.append(func_name)
 
             if self.report_mode:
@@ -155,26 +161,32 @@ class PyftraceSetprofile(PyftraceBase):
         if not self.tracing_started:
             return
 
-        code = frame.f_code if not is_c_return else None
-        func_name = code.co_name if code else arg.__name__
-        filename = resolve_filename(code, None) if code else resolve_filename(None, arg)
+        if is_c_return:
+            func_name = getattr(arg, '__name__', str(arg))
+            module_name = getattr(arg, '__module__', '') or ''
+            code = None
+            filename = None
+        else:
+            code = frame.f_code
+            func_name = code.co_name
+            module_name = frame.f_globals.get('__name__', '') or ''
+            filename = resolve_filename(code, None)
+
         if filename:
             filename = os.path.abspath(filename)
 
-        if filename.startswith(self.tracer_dir):
+        if filename and filename.startswith(self.tracer_dir):
             return
 
-        # Skip tracing '<module>'
         if func_name == '<module>':
             return
 
-        # Exclude stdlib and frozen modules
         if self.is_stdlib_code(filename):
-            return
+            if not (self.verbose and module_name == 'builtins'):
+                return
 
         trace_this = False
 
-        # Compare function names instead of frames
         if self.call_stack and self.call_stack[-1] == func_name:
             trace_this = True
 
