@@ -66,8 +66,9 @@ class PyftraceBase(ABC):
             return False
         if file_name.startswith('<frozen'):
             return True  # Exclude frozen modules
-        abs_file_name = os.path.abspath(file_name)
-        return abs_file_name.startswith(self.stdlib_dir)
+        abs_file_name = os.path.normcase(os.path.abspath(file_name))
+        stdlib_dir_norm = os.path.normcase(self.stdlib_dir)
+        return abs_file_name.startswith(stdlib_dir_norm)
 
     def find_import_end_line(self, script_path):
         """
