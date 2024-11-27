@@ -10,7 +10,7 @@ class PyftraceMonitoring(PyftraceBase):
     """
     sys.monitoring based tracer.
     """
-    def setup_monitoring(self):
+    def setup_tracing(self):
         self.tool_id = 1
         sys.monitoring.use_tool_id(self.tool_id, "pyftrace")
         sys.monitoring.register_callback(self.tool_id, sys.monitoring.events.CALL, self.monitor_call)
@@ -25,7 +25,7 @@ class PyftraceMonitoring(PyftraceBase):
             sys.monitoring.events.C_RAISE
         )
 
-    def cleanup_monitoring(self):
+    def cleanup_tracing(self):
         sys.monitoring.free_tool_id(self.tool_id)
         self.output_stream = None
 
@@ -47,23 +47,14 @@ class PyftraceMonitoring(PyftraceBase):
 
         self.tracing_started = False
 
-        self.setup_monitoring()
+        self.setup_tracing()
 
         try:
             exec(code_object, {"__file__": script_path, "__name__": "__main__"})
         finally:
-            self.cleanup_monitoring()
+            self.cleanup_tracing()
             sys.path = old_sys_path
             sys.argv = old_sys_argv
-
-    def print_report(self):
-        print("\nFunction Name\t| Total Execution Time\t| Call Count")
-        print("---------------------------------------------------------")
-        sorted_report = sorted(
-            self.execution_report.items(), key=lambda item: item[1][1], reverse=True
-        )
-        for func_name, (_, total_time, call_count) in sorted_report:
-            print(f"{func_name:<15}\t| {total_time:.6f} seconds\t| {call_count}")
 
     def monitor_call(self, code, instruction_offset, callable_obj, arg0):
         self.handle_call_event(code, instruction_offset, callable_obj)

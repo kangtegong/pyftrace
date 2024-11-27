@@ -9,10 +9,10 @@ class PyftraceSetprofile(PyftraceBase):
     """
     sys.setprofile based tracer
     """
-    def setup_monitoring(self):
+    def setup_tracing(self):
         sys.setprofile(self.profile_func)
 
-    def cleanup_monitoring(self):
+    def cleanup_tracing(self):
         sys.setprofile(None)
 
     def run_python_script(self, script_path, script_args):
@@ -36,23 +36,14 @@ class PyftraceSetprofile(PyftraceBase):
 
         self.tracing_started = False
 
-        self.setup_monitoring()
+        self.setup_tracing()
 
         try:
             exec(code_object, {"__file__": script_path, "__name__": "__main__"})
         finally:
-            self.cleanup_monitoring()
+            self.cleanup_tracing()
             sys.path = old_sys_path
             sys.argv = old_sys_argv
-
-    def print_report(self):
-        print("\nFunction Name\t| Total Execution Time\t| Call Count")
-        print("---------------------------------------------------------")
-        sorted_report = sorted(
-            self.execution_report.items(), key=lambda item: item[1][1], reverse=True
-        )
-        for func_name, (_, total_time, call_count) in sorted_report:
-            print(f"{func_name:<15}\t| {total_time:.6f} seconds\t| {call_count}")
 
     def profile_func(self, frame, event, arg):
         if event == "call":

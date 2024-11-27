@@ -26,20 +26,25 @@ class PyftraceBase(ABC):
         self.stdlib_dir = os.path.abspath(sysconfig.get_paths()["stdlib"])
 
     @abstractmethod
-    def setup_monitoring(self):
+    def setup_tracing(self):
         pass
 
     @abstractmethod
-    def cleanup_monitoring(self):
+    def cleanup_tracing(self):
         pass
 
     @abstractmethod
     def run_python_script(self, script_path, script_args):
         pass
 
-    @abstractmethod
     def print_report(self):
-        pass
+        print("\nFunction Name\t| Total Execution Time\t| Call Count")
+        print("---------------------------------------------------------")
+        sorted_report = sorted(
+            self.execution_report.items(), key=lambda item: item[1][1], reverse=True
+        )
+        for func_name, (_, total_time, call_count) in sorted_report:
+            print(f"{func_name:<15}\t| {total_time:.6f} seconds\t| {call_count}")
 
     def current_depth(self):
         return len(self.call_stack)
