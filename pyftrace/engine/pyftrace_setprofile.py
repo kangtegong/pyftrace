@@ -85,6 +85,8 @@ class PyftraceSetprofile(PyftraceBase):
             filename = resolve_filename(code, None)
             caller_frame = frame.f_back
 
+        # print(f"[DEBUG] handle_call_event: event={'c_call' if is_c_call else 'call'}, func_name={func_name}, module_name={module_name}, filename={filename}")
+
         if filename:
             filename = os.path.abspath(filename)
 
@@ -171,6 +173,8 @@ class PyftraceSetprofile(PyftraceBase):
             func_name = code.co_name
             module_name = frame.f_globals.get('__name__', '') or ''
             filename = resolve_filename(code, None)
+
+        # # print(f"[DEBUG] handle_return_event: event={'c_return' if is_c_return else 'return'}, func_name={func_name}, module_name={module_name}, filename={filename}")
 
         if filename:
             filename = os.path.abspath(filename)
