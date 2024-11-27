@@ -1,6 +1,6 @@
 import sys
 import argparse
-from .tracer import Pyftrace
+from .tracer import get_tracer
 from .tui import run_tui
 from . import __version__
 import tempfile
@@ -51,7 +51,7 @@ def main():
 
         try:
             with open(temp_file_path, "w") as f:
-                tracer = Pyftrace(verbose=args.verbose, show_path=args.path, output_stream=f)
+                tracer = get_tracer(verbose=args.verbose, show_path=args.path, report_mode=False, output_stream=f)
                 tracer.run_python_script(script_path, script_args)
             run_tui(temp_file_path)
 
@@ -59,10 +59,10 @@ def main():
             if os.path.exists(temp_file_path):
                 os.remove(temp_file_path)
     else:
-        tracer = Pyftrace(verbose=args.verbose, show_path=args.path, report_mode=args.report)
+        tracer = get_tracer(verbose=args.verbose, show_path=args.path, report_mode=args.report)
         tracer.run_python_script(script_path, script_args)
 
-        if tracer.report_mode:
+        if args.report:
             tracer.print_report()
             sys.exit(0)
 

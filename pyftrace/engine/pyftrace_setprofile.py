@@ -2,7 +2,7 @@ import sys
 import os
 import time
 import sysconfig
-from ..pyftrace_base import PyftraceBase
+from ..tracer import PyftraceBase
 from ..utils import resolve_filename, get_line_number
 
 class PyftraceSetprofile(PyftraceBase):
