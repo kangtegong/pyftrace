@@ -64,9 +64,13 @@ class PyftraceTests(unittest.TestCase):
 
     def normalize_output(self, text):
         """
-        Normalize text by trimming lines and reducing multiple spaces.
+        Normalize text by trimming lines, reducing spaces, and unifying line endings.
         """
-        return '\n'.join(' '.join(line.strip().split()) for line in text.strip().splitlines())
+        # Normalize paths, trim lines, and reduce multiple spaces
+        normalized = '\n'.join(' '.join(line.strip().split()) for line in text.strip().splitlines())
+        # Standardize path separators for Windows
+        normalized = normalized.replace("\r\n", "\n").replace("\\", "/")
+        return normalized
 
     def test_version_flag_short_v(self):
         """
