@@ -9,6 +9,9 @@ class PyftraceSetprofile(PyftraceBase):
     """
     sys.setprofile based tracer
     """
+    def __init__(self, verbose=False, show_path=False, report_mode=False, output_stream=sys.stdout, max_depth=0):
+        super().__init__(verbose, show_path, report_mode, output_stream, max_depth)
+
     def setup_tracing(self):
         sys.setprofile(self.profile_func)
 
@@ -60,6 +63,10 @@ class PyftraceSetprofile(PyftraceBase):
             pass
 
     def handle_call_event(self, frame, arg, is_c_call=False):
+        # check depth limit
+        if self.max_depth > 0 and self.current_depth() >= self.max_depth:
+            return
+
         if is_c_call:
             # Get the '__name__' attribute of 'arg', or use str(arg) if '__name__' is not present
             func_name = getattr(arg, '__name__', str(arg))

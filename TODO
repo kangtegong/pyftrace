@@ -3,8 +3,6 @@
   - -vv option: Additionally enable site_packages_modules tracing 
   - -vvv option: Additionally enable stdlib tracing 
     - stdlib path: sysconfig.get_paths()["stdlib"]
-- depth limit: --depth/-D <int> 
-- trace format using ├, │, ─ 
 - tui: fold/unfold
 - tui: '/' (search function)
 - function filtering: --function/-f <string>

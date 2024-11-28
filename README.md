@@ -66,6 +66,7 @@ $ pip install pyftrace
 
 ### Command-Line Options
 
+- `--depth` or `-d`: Limit the depth of function call tracing. Only functions up to the specified depth will be traced.
 - `--report` or `-r`: Generate a report of function execution times and call counts at the end of the script's execution.
 - `--verbose` or `-v`: Enable tracing of built-in functions (e.g., print, len). Without this flag, pyftrace only traces user-defined functions.
 - `--path` or `-p`: Include file paths in the tracing output. 
@@ -281,6 +282,13 @@ function_a     	| 0.000021 seconds	| 1
 function_b     	| 0.000016 seconds	| 1
 ```
 
+### Limiting Trace Depth with `--depth`
+
+To limit the tracing to a specific depth level:
+
+```
+$ pyftrace --depth 2 examples/module_trace/main_script.py
+```
 
 ### Notes
 - simple-pyftrace.py is a simplified pyftrace script for the [Pycon Korea 2024](https://2024.pycon.kr/) presentation. It is about 100 lines of code, but has limited functionality. 

@@ -8,7 +8,7 @@ class PyftraceBase(ABC):
     """
     Abstract base class defining the interface for tracers.
     """
-    def __init__(self, verbose=False, show_path=False, report_mode=False, output_stream=sys.stdout):
+    def __init__(self, verbose=False, show_path=False, report_mode=False, output_stream=sys.stdout, max_depth=0):
         self.script_name = None
         self.script_dir = None
         self.report_mode = report_mode
@@ -21,6 +21,7 @@ class PyftraceBase(ABC):
         self.show_path = show_path
         self.output_stream = output_stream
         self.import_end_line = 0
+        self.max_depth = max_depth
 
         # Get the standard library directory
         self.stdlib_dir = os.path.abspath(sysconfig.get_paths()["stdlib"])
@@ -57,6 +58,9 @@ class PyftraceBase(ABC):
             return False
         if self.is_stdlib_code(abs_file_name):
             return False
+        # Check depth limit
+        if self.max_depth > 0 and self.current_depth() >= self.max_depth:
+            return False
         return True
 
     def is_tracer_code(self, file_name):
@@ -78,9 +82,9 @@ class PyftraceBase(ABC):
 from .engine.pyftrace_monitoring import PyftraceMonitoring
 from .engine.pyftrace_setprofile import PyftraceSetprofile
 
-def get_tracer(verbose=False, show_path=False, report_mode=False, output_stream=sys.stdout):
+def get_tracer(verbose=False, show_path=False, report_mode=False, output_stream=sys.stdout, max_depth=0):
     if sys.version_info >= (3, 12):
-        return PyftraceMonitoring(verbose, show_path, report_mode, output_stream)
+        return PyftraceMonitoring(verbose, show_path, report_mode, output_stream, max_depth)
     else:
-        return PyftraceSetprofile(verbose, show_path, report_mode, output_stream)
+        return PyftraceSetprofile(verbose, show_path, report_mode, output_stream, max_depth)
 

@@ -64,6 +64,7 @@ $ pip install pyftrace
 - `--report` 또는 `-r`: 스크립트 실행이 끝난 후 함수 실행 시간 및 호출 횟수 보고서를 생성합니다.
 - `--verbose` 또는 `-v`: 내장 함수(print, len 등)의 추적을 활성화합니다. 이 옵션 없이 사용될 경우 pyftrace는 사용자 정의 함수만 추적합니다.
 - `--path` 또는 `-p`: 추적 출력에 파일 경로를 포함합니다.
+- `--depth` 또는 `-d`: 함수 호출 추적의 깊이를 제한합니다. 지정한 깊이까지의 함수만 추적됩니다.
 - `--help` 또는 `-h`: pyftrace 및 해당 옵션에 대한 도움말 정보를 표시합니다.
 - `--version` 또는 `-V`: pyftrace 버전을 출력합니다.
 
@@ -223,6 +224,29 @@ Function Name	| Total Execution Time	| Call Count
 main           	| 0.000082 seconds	| 1
 function_a     	| 0.000022 seconds	| 1
 function_b     	| 0.000008 seconds	| 1
+```
+
+### `--depth`로 추적 깊이 제한
+
+특정 깊이 수준으로 추적을 제한하려면:
+
+```
+$ pyftrace --depth 2 examples/module_trace/main_script.py
+```
+
+출력 결과:
+```
+Running script: examples/module_trace/main_script.py
+Called main from line 10
+    Called function_a from line 5
+Function A is called.
+    Returning function_a-> ret_a
+    Called function_b from line 6
+Function B is called.
+    Returning function_b-> ret_b
+Results: ret_a, ret_b
+Returning main-> None
+Returning <module>-> None
 ```
 
 ### `--verbose`와 `--path` 결합

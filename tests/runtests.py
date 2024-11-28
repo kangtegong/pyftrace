@@ -162,6 +162,30 @@ class PyftraceTests(unittest.TestCase):
         self.assertEqual(normalized_expected, normalized_actual)
         self.assertEqual(result.returncode, 0)
 
+    # def test_tracing_script_depth(self):
+    #     """
+    #     Test '--depth' flag to limit tracing depth.
+    #     """
+    #     args = [self.main_script, '--depth', '2']
+    #     result = self.run_pyftrace(args)
+
+    #     expected_output = f"""Running script: {self.main_script}
+    # Called main from line 10
+    #     Called function_a from line 5
+    #     Function A is called.
+    #     Returning function_a-> ret_a
+    #     Called function_b from line 6
+    #     Function B is called.
+    #     Returning function_b-> ret_b
+    # Results: ret_a, ret_b
+    # Returning main-> None"""
+
+    #     normalized_expected = self.normalize_output(expected_output)
+    #     normalized_actual = self.normalize_output(result.stdout)
+
+    #     self.assertEqual(normalized_expected, normalized_actual)
+    #     self.assertEqual(result.returncode, 0)
+
     # def test_tracing_script_path(self):
     #     """
     #     Test '--path' flag to include file paths in tracing.
