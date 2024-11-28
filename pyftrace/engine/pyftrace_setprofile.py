@@ -3,7 +3,7 @@ import os
 import time
 import sysconfig
 from ..tracer import PyftraceBase
-from ..utils import resolve_filename, get_line_number
+from ..utils import *
 
 class PyftraceSetprofile(PyftraceBase):
     """
@@ -23,7 +23,7 @@ class PyftraceSetprofile(PyftraceBase):
         self.script_dir = os.path.dirname(self.script_name)
 
         # For use import_end_line to start tracing after imports
-        self.import_end_line = self.find_import_end_line(script_path)
+        self.import_end_line = find_import_end_line(script_path)
 
         with open(script_path, "r") as file:
             script_code = file.read()

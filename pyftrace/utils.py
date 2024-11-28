@@ -41,3 +41,18 @@ def get_line_number(code, instruction_offset):
             return lineno
     return code.co_firstlineno
 
+def find_import_end_line(script_path):
+    """
+    Finds the last line number of import statements in the script.
+    """
+    import_line_numbers = []
+    with open(script_path, 'r') as f:
+        for lineno, line in enumerate(f, 1):
+            stripped_line = line.strip()
+            if stripped_line.startswith('import ') or stripped_line.startswith('from '):
+                import_line_numbers.append(lineno)
+    if import_line_numbers:
+        return max(import_line_numbers)
+    else:
+        return 0
+
