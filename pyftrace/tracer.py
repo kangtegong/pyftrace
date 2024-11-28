@@ -74,22 +74,6 @@ class PyftraceBase(ABC):
         stdlib_dir_norm = os.path.normcase(self.stdlib_dir)
         return abs_file_name.startswith(stdlib_dir_norm)
 
-    def find_import_end_line(self, script_path):
-        """
-        Finds the last line number of import statements in the script.
-        """
-        import_line_numbers = []
-        with open(script_path, 'r') as f:
-            for lineno, line in enumerate(f, 1):
-                stripped_line = line.strip()
-                if stripped_line.startswith('import ') or stripped_line.startswith('from '):
-                    import_line_numbers.append(lineno)
-        if import_line_numbers:
-            return max(import_line_numbers)
-        else:
-            return 0
-
-
 # Import engine modules AFTER defining PyftraceBase (avoid circular imports)
 from .engine.pyftrace_monitoring import PyftraceMonitoring
 from .engine.pyftrace_setprofile import PyftraceSetprofile
