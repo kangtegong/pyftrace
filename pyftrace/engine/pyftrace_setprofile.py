@@ -41,6 +41,7 @@ class PyftraceSetprofile(PyftraceBase):
         try:
             exec(code_object, {"__file__": script_path, "__name__": "__main__"})
         finally:
+            self.tracing_started = False
             self.cleanup_tracing()
             sys.path = old_sys_path
             sys.argv = old_sys_argv
@@ -85,10 +86,21 @@ class PyftraceSetprofile(PyftraceBase):
             return
 
         if not self.tracing_started:
-            if filename == self.script_name and frame.f_lineno > self.import_end_line:
-                self.tracing_started = True
+            start_tracing = False
+            if filename == self.script_name and code and frame.f_lineno > self.import_end_line:
+                start_tracing = True
             else:
+                if caller_frame and caller_frame.f_code:
+                    caller_filename = resolve_filename(caller_frame.f_code, None)
+                    if caller_filename:
+                        caller_filename = os.path.abspath(caller_filename)
+                    if (caller_filename == self.script_name
+                        and caller_frame.f_lineno > self.import_end_line):
+                        start_tracing = True
+
+            if not start_tracing:
                 return
+            self.tracing_started = True
 
         if func_name == '<module>':
             return
@@ -100,14 +112,19 @@ class PyftraceSetprofile(PyftraceBase):
                 return
             trace_this = True
         else:
-            if self.should_trace(filename):
-                trace_this = True
-            elif self.verbose and module_name == 'builtins':
-                trace_this = True
+            if filename is None:
+                # filename is None: C-extension or similar. If verbose, trace anyway.
+                if self.verbose:
+                    trace_this = True
+            else:
+                # Normal logic for user-defined or third-party code
+                if self.should_trace(filename):
+                    trace_this = True
+                elif self.verbose and module_name == 'builtins':
+                    trace_this = True
 
         if trace_this:
             indent = "    " * self.current_depth()
-
             if not is_c_call and code:
                 func_def_lineno = code.co_firstlineno
             else:
@@ -124,11 +141,9 @@ class PyftraceSetprofile(PyftraceBase):
 
             if self.show_path:
                 if func_def_lineno:
-                    func_location = f"{func_name}@{filename}:{func_def_lineno}"
-                elif filename:
-                    func_location = f"{func_name}@{filename}"
+                    func_location = f"{func_name}@{filename}:{func_def_lineno}" if filename else func_name
                 else:
-                    func_location = func_name
+                    func_location = f"{func_name}@{filename}" if filename else func_name
                 if call_filename and call_lineno:
                     call_location = f"from {call_filename}:{call_lineno}"
                 else:
@@ -183,17 +198,19 @@ class PyftraceSetprofile(PyftraceBase):
                 return
             trace_this = True
         else:
-            if self.call_stack and self.call_stack[-1] == func_name:
-                trace_this = True
-
-            if not trace_this:
-                if self.verbose and module_name == 'builtins':
-                    if self.call_stack and self.call_stack[-1] == func_name:
-                        trace_this = True
+            if filename is None:
+                if self.verbose and self.call_stack and self.call_stack[-1] == func_name:
+                    trace_this = True
+            else:
+                if self.call_stack and self.call_stack[-1] == func_name:
+                    trace_this = True
+                else:
+                    if self.verbose and module_name == 'builtins':
+                        if self.call_stack and self.call_stack[-1] == func_name:
+                            trace_this = True
 
         if trace_this and self.call_stack and self.call_stack[-1] == func_name:
-            func_name = self.call_stack.pop()
-
+            self.call_stack.pop()
             indent = "    " * self.current_depth()
 
             if self.show_path:
