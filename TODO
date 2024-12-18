@@ -1,8 +1,3 @@
-- add -vv option for large codebase (e.g. Django, Pytorch, etc)
-  - -v option: Additionally enable built-in functions tracing
-  - -vv option: Additionally enable site_packages_modules tracing 
-  - -vvv option: Additionally enable stdlib tracing 
-    - stdlib path: sysconfig.get_paths()["stdlib"]
 - depth limit: --depth/-D <int> 
 - trace format using ├, │, ─ 
 - tui: fold/unfold
