@@ -96,13 +96,13 @@ class PyftraceSetprofile(PyftraceBase):
         trace_this = False
 
         if self.is_stdlib_code(filename):
-            if not (self.verbose and module_name == 'builtins'):
+            if not self.verbose:
                 return
-
-        if self.should_trace(filename):
             trace_this = True
-        elif self.verbose:
-            if module_name == 'builtins':
+        else:
+            if self.should_trace(filename):
+                trace_this = True
+            elif self.verbose and module_name == 'builtins':
                 trace_this = True
 
         if trace_this:
@@ -176,16 +176,22 @@ class PyftraceSetprofile(PyftraceBase):
         if func_name == '<module>':
             return
 
-        if self.is_stdlib_code(filename):
-            if not (self.verbose and module_name == 'builtins'):
-                return
-
         trace_this = False
 
-        if self.call_stack and self.call_stack[-1] == func_name:
+        if self.is_stdlib_code(filename):
+            if not self.verbose:
+                return
             trace_this = True
+        else:
+            if self.call_stack and self.call_stack[-1] == func_name:
+                trace_this = True
 
-        if trace_this:
+            if not trace_this:
+                if self.verbose and module_name == 'builtins':
+                    if self.call_stack and self.call_stack[-1] == func_name:
+                        trace_this = True
+
+        if trace_this and self.call_stack and self.call_stack[-1] == func_name:
             func_name = self.call_stack.pop()
 
             indent = "    " * self.current_depth()
