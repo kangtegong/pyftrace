@@ -7,7 +7,7 @@
 
 ## Introduction
 
-**pyftrace** is a lightweight Python function tracing tool designed to monitor and report on function calls within Python scripts. It leverages Python 3.12's sys.monitoring to monitor Python events and trace functions based on the results. With pyftrace, you can trace function calls across multiple modules, visualize call hierarchies, and generate execution time reports.
+**pyftrace** is a lightweight Python function tracing tool designed to monitor and report on function calls within Python scripts. It leverages sys.setprofile(Python 3.8 ~ 3.11), sys.monitoring(Python 3.12 ~) to monitor Python events and trace functions based on the results. With pyftrace, you can trace function calls across multiple modules, visualize call hierarchies, and generate execution time reports.
 
 ![pyftrace-demo](assets/pyftrace-demo.gif)
 
@@ -41,7 +41,7 @@ options:
 
 ### Requirements
 
-- **Python Version**: pyftrace requires **Python 3.12** or higher due to its use of the new `sys.monitoring` module introduced in Python 3.12.
+- **Python Version**: pyftrace requires **Python 3.8+**.
 
 ```bash
 $ pyftrace [options] /path/to/python/script.py

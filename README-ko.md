@@ -2,7 +2,7 @@
 
 ## Introduction
 
-**pyftrace**는 Python 스크립트 내에서 함수 호출을 모니터링할 수 있는 경량 Python 함수 추적 도구입니다. Python 3.12의 `sys.monitoring`을 활용하여 Python 이벤트를 모니터링하고, 모니터링 결과를 기반으로 함수 호출/리턴을 추적합니다. pyftrace를 사용하면 여러 모듈에 걸친 함수 호출을 추적할 수 있고, 호출 계층 구조를 시각적으로 나타낼 수 있으며, 추적 결과 보고서를 생성할 수 있습니다.
+**pyftrace**는 Python 스크립트 내에서 함수 호출을 모니터링할 수 있는 경량 Python 함수 추적 도구입니다. Python 3.8 ~3.11 버전에서는 `sys.setprofile`을,  Python 3.12 이상 버전에서는 `sys.monitoring`을 활용하여 Python 이벤트를 모니터링하고, 모니터링 결과를 기반으로 함수 호출/리턴을 추적합니다. pyftrace를 사용하면 여러 모듈에 걸친 함수 호출을 추적할 수 있고, 호출 계층 구조를 시각적으로 나타낼 수 있으며, 추적 결과 보고서를 생성할 수 있습니다.
 
 ![pyftrace-demo](assets/pyftrace-demo.gif)
 
@@ -36,7 +36,7 @@ options:
 
 ### 요구 사항
 
-- **Python 버전**: pyftrace는 Python 3.12 이상이 필요합니다. Python 3.12에 도입된 새로운 `sys.monitoring` 모듈을 사용하기 때문입니다.
+- **Python 버전**: pyftrace는 Python 3.8 이상이 필요합니다.
 
 ```bash
 $ pyftrace [options] /path/to/python/script.py
