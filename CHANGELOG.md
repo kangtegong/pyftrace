@@ -1,5 +1,33 @@
 # Changelog
 
+## [0.3.0] - 2024-12-19
+
+### Added
+- New Examples:
+  - `examples/requests_example.py`: Demonstrates tracing HTTP requests made via `requests.get()`.
+  - `examples/torch_example.py`: Demonstrates tracing with the `torch` library.
+- Enhanced Tracing Logic:
+  - Introduced logic to detect if an external function call is triggered by user script code beyond the import phase.
+  - Verbose mode (`-v`) now also traces standard library functions, not just built-ins.
+
+### Changed
+- ★ Support Python Version 3.8+ (Wider Python Version Support):
+  - Lowered the minimum required Python version from 3.12 to 3.8. On Python 3.8~3.11, `sys.setprofile` is used; on 3.12 and above, `sys.monitoring` is used.
+- CI Configuration:
+  - Simplified GitHub Actions CI matrix to use only `ubuntu-latest` for testing, removing Windows and macOS from the test matrix.
+- Codebase Refinements:
+  - Consolidated and refactored the tracing logic to be more maintainable.
+  - Merged `PyftraceBase` into `tracer.py` and refactored engines (`pyftrace_monitoring.py`, `pyftrace_setprofile.py`) to import from it directly.
+
+### Fixed
+- Top-level External Calls:
+  - Fixed an issue where top-level external library calls would not appear in the trace because tracing started only after a call in the user script.
+    - Now caller frames are checked: if the calling frame belongs to the user script after imports, tracing starts immediately.
+- Normalization of Paths and Encodings:
+  - Ensured consistent path normalization and line ending handling.
+
+---
+
 ## [0.2.0] - 2024-11-11
 
 ### Added
