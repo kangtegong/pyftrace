@@ -13,11 +13,12 @@
 
 Key features of pyftrace include:
 
-- **Function Call/Return Tracing**: Monitor calls/returns to functions in your Python script and imported modules.
-- **Built-in Function Tracing**: Optionally trace built-in functions like `print` using the `--verbose` flag.
-- **Multiple Module Support**: Trace functions across multiple files within your project.
-- **Execution Reports**: Generate reports detailing function execution times and call counts with the `--report` flag.
-- **Path Tracing**: Trace the path of traced Python file using the `--path` flag.
+- **Function Call/Return Tracing**: Monitor calls/returns to functions in Python script and imported modules.
+- **Built-in, Library Function Tracing**: Pyftrace can not only trace user-defined functions, but also trace functions in external libraries or built-in functions (e.g. `print`, `len`) with `--verbose`/`-v` option.
+- **Multiple Module Tracing Support**: Trace functions across multiple files.
+- **Execution Reports**: Generate reports detailing function execution times and call counts with the `--report`/`-r` option.
+- **File Path Tracing**: Trace the file path of traced Python file with `--path`/`-p` option.
+- **Limit Tracing Depth**: Control the depth of function call tracing with the `--depth`/`-d` option.
 - **TUI Mode**: Run pyftrace in a Text User Interface (TUI) mode using the `tui` command.
 
 ```
@@ -27,14 +28,16 @@ usage: pyftrace [options] [tui] script [script_args ...]
 pyftrace: Python function tracing tool.
 
 positional arguments:
-  script         Path to the script to run and trace. Specify 'tui' before the script path to run in TUI mode.
+  script                Path to the script to run and trace. Specify 'tui' before the script path to run in TUI mode.
 
 options:
-  -h, --help     show this help message and exit
-  -V, --version  Show the version of pyftrace and exit
-  -v, --verbose  Enable built-in and third-party function tracing
-  -p, --path     Show file paths in tracing output
-  -r, --report   Generate a report of function execution times
+  -h, --help            show this help message and exit
+  -V, --version         Show the version of pyftrace and exit
+  -v, --verbose         Enable built-in and third-party function tracing
+  -p, --path            Show file paths in tracing output
+  -r, --report          Generate a report of function execution times
+  -d DEPTH, --depth DEPTH
+                        Limit the tracing output to DEPTH
 ```
 
 ## Usage
@@ -61,7 +64,7 @@ or
 $ pip install pyftrace
 ```
 
-> note: on Windows, windows-curses is required.
+> note: on Windows, `windows-curses` is required.
 
 
 ### Command-Line Options
@@ -71,6 +74,7 @@ $ pip install pyftrace
 - `--path` or `-p`: Include file paths in the tracing output. 
 - `--help` or `-h`: Display help information about pyftrace and its options.
 - `--version` or `-V`: Display help information about pyftrace and its options.
+- `--depth` or `-d`: Limit the depth of the trace.
 
 ## TUI
 
@@ -135,16 +139,15 @@ $ pyftrace examples/module_trace/main_script.py
 output:
 ```
 Running script: examples/module_trace/main_script.py
-Called main from line 10
-    Called function_a from line 5
+    Called main from line 10
+        Called function_a from line 5
 Function A is called.
-    Returning function_a-> ret_a
-    Called function_b from line 6
+        Returning function_a-> ret_a
+        Called function_b from line 6
 Function B is called.
-    Returning function_b-> ret_b
+        Returning function_b-> ret_b
 Results: ret_a, ret_b
-Returning main-> None
-Returning <module>-> None
+    Returning main-> None
 ```
 
 ### Trace Built-in Functions with `--verbose`
@@ -156,22 +159,21 @@ $ pyftrace --verbose examples/module_trace/main_script.py
 output:
 ```
 Running script: examples/module_trace/main_script.py
-Called main from line 10
-    Called function_a from line 5
-        Called print from line 2
+    Called main from line 10
+        Called function_a from line 5
+            Called print from line 2
 Function A is called.
-        Returning print
-    Returning function_a-> ret_a
-    Called function_b from line 6
-        Called print from line 2
+            Returning print
+        Returning function_a-> ret_a
+        Called function_b from line 6
+            Called print from line 2
 Function B is called.
-        Returning print
-    Returning function_b-> ret_b
-    Called print from line 7
+            Returning print
+        Returning function_b-> ret_b
+        Called print from line 7
 Results: ret_a, ret_b
-    Returning print
-Returning main-> None
-Returning <module>-> None
+        Returning print
+    Returning main-> None
 ```
 
 ### Showing File Paths with `--path`
@@ -183,7 +185,7 @@ $ pyftrace --path examples/module_trace/main_script.py
 In this case, When a function is called, pyftrace displays it in the following format:
 
 ```
-Called {function} @ {defined file path}:{defined line} from {called file path}:{called line}
+Called {function} [@ {defined file path}:{defined line}] from {called file path}:{called line}
 ```
 
 - `{function}`: name of the function being called 
@@ -195,16 +197,15 @@ Called {function} @ {defined file path}:{defined line} from {called file path}:{
 output:
 ```
 Running script: examples/module_trace/main_script.py
-Called main@examples/module_trace/main_script.py:4 from examples/module_trace/main_script.py:10
-    Called function_a@examples/module_trace/module_a.py:1 from examples/module_trace/main_script.py:5
+    Called main@examples/module_trace/main_script.py:4 from examples/module_trace/main_script.py:10
+        Called function_a@examples/module_trace/module_a.py:1 from examples/module_trace/main_script.py:5
 Function A is called.
-    Returning function_a-> ret_a @ examples/module_trace/module_a.py
-    Called function_b@examples/module_trace/module_b.py:1 from examples/module_trace/main_script.py:6
+        Returning function_a-> ret_a @ examples/module_trace/module_a.py
+        Called function_b@examples/module_trace/module_b.py:1 from examples/module_trace/main_script.py:6
 Function B is called.
-    Returning function_b-> ret_b @ examples/module_trace/module_b.py
+        Returning function_b-> ret_b @ examples/module_trace/module_b.py
 Results: ret_a, ret_b
-Returning main-> None @ examples/module_trace/main_script.py
-Returning <module>-> None @ examples/module_trace/main_script.py
+    Returning main-> None @ examples/module_trace/main_script.py
 ```
 
 ### Generating an Execution Report
@@ -241,22 +242,21 @@ $ pyftrace -vp examples/module_trace/main_script.py
 output:
 ```
 Running script: examples/module_trace/main_script.py
-Called main@examples/module_trace/main_script.py:4 from examples/module_trace/main_script.py:10
-    Called function_a@examples/module_trace/module_a.py:1 from examples/module_trace/main_script.py:5
-        Called print@builtins from examples/module_trace/module_a.py:2
+    Called main@examples/module_trace/main_script.py:4 from examples/module_trace/main_script.py:10
+        Called function_a@examples/module_trace/module_a.py:1 from examples/module_trace/main_script.py:5
+            Called print from examples/module_trace/module_a.py:2
 Function A is called.
-        Returning print @ examples/module_trace/module_a.py
-    Returning function_a-> ret_a @ examples/module_trace/module_a.py
-    Called function_b@examples/module_trace/module_b.py:1 from examples/module_trace/main_script.py:6
-        Called print@builtins from examples/module_trace/module_b.py:2
+            Returning print
+        Returning function_a-> ret_a @ examples/module_trace/module_a.py
+        Called function_b@examples/module_trace/module_b.py:1 from examples/module_trace/main_script.py:6
+            Called print from examples/module_trace/module_b.py:2
 Function B is called.
-        Returning print @ examples/module_trace/module_b.py
-    Returning function_b-> ret_b @ examples/module_trace/module_b.py
-    Called print@builtins from examples/module_trace/main_script.py:7
+            Returning print
+        Returning function_b-> ret_b @ examples/module_trace/module_b.py
+        Called print from examples/module_trace/main_script.py:7
 Results: ret_a, ret_b
-    Returning print @ examples/module_trace/main_script.py
-Returning main-> None @ examples/module_trace/main_script.py
-Returning <module>-> None @ examples/module_trace/main_script.py
+        Returning print
+    Returning main-> None @ examples/module_trace/main_script.py
 ```
 
 ### Combining `--verbose` and `--report`
@@ -279,6 +279,37 @@ main           	| 0.000127 seconds	| 1
 print          	| 0.000041 seconds	| 3
 function_a     	| 0.000021 seconds	| 1
 function_b     	| 0.000016 seconds	| 1
+```
+
+### Limiting the trace depth
+
+```
+$ pyftrace examples/module_trace/main_script.py --depth 1
+$ pyftrace examples/module_trace/main_script.py -d 2
+```
+
+output:
+
+```
+$ pyftrace examples/module_trace/main_script.py --depth 1
+Running script: examples/module_trace/main_script.py
+    Called main from line 10
+Function A is called.
+Function B is called.
+Results: ret_a, ret_b
+    Returning main-> None
+
+$ pyftrace examples/module_trace/main_script.py -d 2
+Running script: examples/module_trace/main_script.py
+    Called main from line 10
+        Called function_a from line 5
+Function A is called.
+        Returning function_a-> ret_a
+        Called function_b from line 6
+Function B is called.
+        Returning function_b-> ret_b
+Results: ret_a, ret_b
+    Returning main-> None
 ```
 
 

@@ -9,7 +9,7 @@
 pyftrace의 주요 기능:
 
 - **함수 호출/반환 추적**: Python 스크립트 및 임포트된 모듈 내의 함수 호출/반환을 모니터링합니다.
-- **내장 함수 추적**: `--verbose` 옵션을 사용하여 `print`와 같은 내장 함수를 선택적으로 추적할 수 있습니다.
+- **내장 함수, 외부 라이브러리 추적**: `--verbose` 옵션을 사용하여 내장 함수(예: `print`, `len`)와 외부 라이브러리 내 함수를 선택적으로 추적할 수 있습니다.
 - **다중 모듈 추적**: 여러 파일에 걸친 함수 추적을 지원합니다.
 - **실행 보고서**: `--report` 옵션을 사용하여 함수 실행 시간 및 호출 횟수를 상세히 기록한 보고서를 생성합니다.
 - **경로 추적**: `--path` 옵션을 사용하여 추적된 Python 파일의 경로를 추적합니다.
@@ -22,14 +22,16 @@ usage: pyftrace [options] [tui] script [script_args ...]
 pyftrace: Python function tracing tool.
 
 positional arguments:
-  script         Path to the script to run and trace. Specify 'tui' before the script path to run in TUI mode.
+  script                Path to the script to run and trace. Specify 'tui' before the script path to run in TUI mode.
 
 options:
-  -h, --help     show this help message and exit
-  -V, --version  Show the version of pyftrace and exit
-  -v, --verbose  Enable built-in and third-party function tracing
-  -p, --path     Show file paths in tracing output
-  -r, --report   Generate a report of function execution times
+  -h, --help            show this help message and exit
+  -V, --version         Show the version of pyftrace and exit
+  -v, --verbose         Enable built-in and third-party function tracing
+  -p, --path            Show file paths in tracing output
+  -r, --report          Generate a report of function execution times
+  -d DEPTH, --depth DEPTH
+                        Limit the tracing output to DEPTH
 ```
 
 ## 사용법
@@ -56,7 +58,7 @@ $ pip install -e .
 $ pip install pyftrace
 ```
 
-> note: 윈도우에서는 windows-curses 설치 필요
+> note: 윈도우에서는 `windows-curses` 설치 필요
 
 
 ### 기본 옵션
@@ -66,6 +68,7 @@ $ pip install pyftrace
 - `--path` 또는 `-p`: 추적 출력에 파일 경로를 포함합니다.
 - `--help` 또는 `-h`: pyftrace 및 해당 옵션에 대한 도움말 정보를 표시합니다.
 - `--version` 또는 `-V`: pyftrace 버전을 출력합니다.
+- `--depth` 또는 `-d`: 추적 결과의 깊이를 제한합니다.
 
 ## TUI
 
@@ -130,16 +133,15 @@ $ pyftrace examples/module_trace/main_script.py
 출력 결과:
 ```
 Running script: examples/module_trace/main_script.py
-Called main from line 10
-    Called function_a from line 5
+    Called main from line 10
+        Called function_a from line 5
 Function A is called.
-    Returning function_a-> ret_a
-    Called function_b from line 6
+        Returning function_a-> ret_a
+        Called function_b from line 6
 Function B is called.
-    Returning function_b-> ret_b
+        Returning function_b-> ret_b
 Results: ret_a, ret_b
-Returning main-> None
-Returning <module>-> None
+    Returning main-> None
 ```
 
 ### `--verbose`로 내장 함수 추적
@@ -151,22 +153,21 @@ $ pyftrace --verbose examples/module_trace/main_script.py
 출력 결과:
 ```
 Running script: examples/module_trace/main_script.py
-Called main from line 10
-    Called function_a from line 5
-        Called print from line 2
+    Called main from line 10
+        Called function_a from line 5
+            Called print from line 2
 Function A is called.
-        Returning print
-    Returning function_a-> ret_a
-    Called function_b from line 6
-        Called print from line 2
+            Returning print
+        Returning function_a-> ret_a
+        Called function_b from line 6
+            Called print from line 2
 Function B is called.
-        Returning print
-    Returning function_b-> ret_b
-    Called print from line 7
+            Returning print
+        Returning function_b-> ret_b
+        Called print from line 7
 Results: ret_a, ret_b
-    Returning print
-Returning main-> None
-Returning <module>-> None
+        Returning print
+    Returning main-> None
 ```
 
 ### `--path`로 파일 경로 추적
@@ -178,29 +179,27 @@ $ pyftrace --path examples/module_trace/main_script.py
 이 경우, 함수가 호출될 때 pyftrace는 함수 추적 결과를 다음 형식으로 출력됩니다:
 
 ```
-Called {function} @ {defined file path}:{defined line} from {called file path}:{called line}
+Called {function} @ [{defined file path}:{defined line}] from {called file path}:{called line}
 ```
 
-- `{function}`: name of the function being called 
-- `{defined file path}`: file path where the function is defined (enabled with `--path` option)
-- `{defined line}`" line number in the defined file
-- `{called line}` line number in the calling file
-- `{called file path}` path to the file that contains the calling function (enabled with `--path` option)
-
+- `{function}`: 호출된 함수 이름
+- `{defined file path}`: 함수가 정의된 파일 경로(`--path` 옵션으로 활성화됨)
+- `{defined line}`: 함수가 정의된 줄 번호
+- `{called line}`: 함수가 호출된 줄 번호
+- `{called file path}`: 호출 함수가 포함된 파일의 경로(`--path` 옵션으로 활성화됨)
 
 출력 결과:
 ```
 Running script: examples/module_trace/main_script.py
-Called main@examples/module_trace/main_script.py:4 from examples/module_trace/main_script.py:10
-    Called function_a@examples/module_trace/module_a.py:1 from examples/module_trace/main_script.py:5
+    Called main@examples/module_trace/main_script.py:4 from examples/module_trace/main_script.py:10
+        Called function_a@examples/module_trace/module_a.py:1 from examples/module_trace/main_script.py:5
 Function A is called.
-    Returning function_a-> ret_a @ examples/module_trace/module_a.py
-    Called function_b@examples/module_trace/module_b.py:1 from examples/module_trace/main_script.py:6
+        Returning function_a-> ret_a @ examples/module_trace/module_a.py
+        Called function_b@examples/module_trace/module_b.py:1 from examples/module_trace/main_script.py:6
 Function B is called.
-    Returning function_b-> ret_b @ examples/module_trace/module_b.py
+        Returning function_b-> ret_b @ examples/module_trace/module_b.py
 Results: ret_a, ret_b
-Returning main-> None @ examples/module_trace/main_script.py
-Returning <module>-> None @ examples/module_trace/main_script.py
+    Returning main-> None @ examples/module_trace/main_script.py
 ```
 
 ### 실행 보고서 생성
@@ -237,22 +236,21 @@ $ pyftrace -vp examples/module_trace/main_script.py
 출력 결과:
 ```
 Running script: examples/module_trace/main_script.py
-Called main@examples/module_trace/main_script.py:4 from examples/module_trace/main_script.py:10
-    Called function_a@examples/module_trace/module_a.py:1 from examples/module_trace/main_script.py:5
-        Called print@builtins from examples/module_trace/module_a.py:2
+    Called main@examples/module_trace/main_script.py:4 from examples/module_trace/main_script.py:10
+        Called function_a@examples/module_trace/module_a.py:1 from examples/module_trace/main_script.py:5
+            Called print from examples/module_trace/module_a.py:2
 Function A is called.
-        Returning print @ examples/module_trace/module_a.py
-    Returning function_a-> ret_a @ examples/module_trace/module_a.py
-    Called function_b@examples/module_trace/module_b.py:1 from examples/module_trace/main_script.py:6
-        Called print@builtins from examples/module_trace/module_b.py:2
+            Returning print
+        Returning function_a-> ret_a @ examples/module_trace/module_a.py
+        Called function_b@examples/module_trace/module_b.py:1 from examples/module_trace/main_script.py:6
+            Called print from examples/module_trace/module_b.py:2
 Function B is called.
-        Returning print @ examples/module_trace/module_b.py
-    Returning function_b-> ret_b @ examples/module_trace/module_b.py
-    Called print@builtins from examples/module_trace/main_script.py:7
+            Returning print
+        Returning function_b-> ret_b @ examples/module_trace/module_b.py
+        Called print from examples/module_trace/main_script.py:7
 Results: ret_a, ret_b
-    Returning print @ examples/module_trace/main_script.py
-Returning main-> None @ examples/module_trace/main_script.py
-Returning <module>-> None @ examples/module_trace/main_script.py
+        Returning print
+    Returning main-> None @ examples/module_trace/main_script.py
 ```
 
 ### `--verbose`와 `--report` 결합
@@ -277,6 +275,36 @@ function_a     	| 0.000021 seconds	| 1
 function_b     	| 0.000016 seconds	| 1
 ```
 
+### 추적 결과 깊이 제한
+
+```
+$ pyftrace examples/module_trace/main_script.py --depth 1
+$ pyftrace examples/module_trace/main_script.py -d 2
+```
+
+output:
+
+```
+$ pyftrace examples/module_trace/main_script.py --depth 1
+Running script: examples/module_trace/main_script.py
+    Called main from line 10
+Function A is called.
+Function B is called.
+Results: ret_a, ret_b
+    Returning main-> None
+
+$ pyftrace examples/module_trace/main_script.py -d 2
+Running script: examples/module_trace/main_script.py
+    Called main from line 10
+        Called function_a from line 5
+Function A is called.
+        Returning function_a-> ret_a
+        Called function_b from line 6
+Function B is called.
+        Returning function_b-> ret_b
+Results: ret_a, ret_b
+    Returning main-> None
+```
 
 ### 참고
 simple-pyftrace.py는 Pycon Korea 2024 발표를 위한 간소화된 pyftrace 스크립트입니다. 약 100줄의 코드로 구성되어 있지만 기능이 제한적입니다.
