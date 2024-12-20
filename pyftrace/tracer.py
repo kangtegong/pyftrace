@@ -21,6 +21,7 @@ class PyftraceBase(ABC):
         self.show_path = show_path
         self.output_stream = output_stream
         self.import_end_line = 0
+        self.max_depth = None
 
         # Get the standard library directory
         self.stdlib_dir = os.path.abspath(sysconfig.get_paths()["stdlib"])

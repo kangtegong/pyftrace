@@ -115,7 +115,9 @@ class PyftraceMonitoring(PyftraceBase):
                     trace_this = True
 
         if trace_this and not self.is_tracer_code(call_filename):
+            self.call_stack.append((func_name, is_builtin))
             indent = "    " * self.current_depth()
+
             if self.show_path:
                 if is_builtin or not def_filename:
                     func_location = f"{func_name}@{module_name or '<builtin>'}"
@@ -125,9 +127,12 @@ class PyftraceMonitoring(PyftraceBase):
             else:
                 func_location = func_name
                 call_location = f"from line {call_lineno}"
+
+            # Check depth limit
             if not self.report_mode and self.output_stream:
-                print(f"{indent}Called {func_location} {call_location}", file=self.output_stream)
-            self.call_stack.append((func_name, is_builtin))
+                if self.max_depth is None or self.current_depth() <= self.max_depth:
+                    print(f"{indent}Called {func_location} {call_location}", file=self.output_stream)
+
             if self.report_mode:
                 start_time = time.time()
                 if func_name in self.execution_report:
@@ -152,29 +157,26 @@ class PyftraceMonitoring(PyftraceBase):
         trace_this = self.should_trace(filename) or self.verbose
 
         if trace_this and not self.is_tracer_code(filename):
-            if self.call_stack:
+            if self.call_stack and self.call_stack[-1][0] == func_name:
+                indent = "    " * self.current_depth()
                 stack_func_name, _ = self.call_stack[-1]
-            else:
-                stack_func_name = "<unknown>"
 
-            indent = "    " * (self.current_depth() - 1)
+                if self.show_path:
+                    file_info = f" @ {filename}" if filename else ""
+                else:
+                    file_info = ""
 
-            if self.show_path:
-                file_info = f" @ {filename}" if filename else ""
-            else:
-                file_info = ""
+                if stack_func_name == func_name:
+                    if not self.report_mode and self.output_stream:
+                        if self.max_depth is None or self.current_depth() <= self.max_depth:
+                            print(f"{indent}Returning {func_name}-> {retval}{file_info}", file=self.output_stream)
 
-            if stack_func_name == func_name:
-                if not self.report_mode and self.output_stream:
-                    print(f"{indent}Returning {func_name}-> {retval}{file_info}", file=self.output_stream)
+                    if self.report_mode and func_name in self.execution_report:
+                        start_time, total_time, call_count = self.execution_report[func_name]
+                        exec_time = time.time() - start_time
+                        self.execution_report[func_name] = (start_time, total_time + exec_time, call_count)
 
-                if self.report_mode and func_name in self.execution_report:
-                    start_time, total_time, call_count = self.execution_report[func_name]
-                    exec_time = time.time() - start_time
-                    self.execution_report[func_name] = (start_time, total_time + exec_time, call_count)
-
-                if self.call_stack and self.call_stack[-1][0] == func_name:
-                    self.call_stack.pop()
+                self.call_stack.pop()
 
     def handle_c_return_event(self, code, instruction_offset, callable_obj):
         if not self.tracing_started:
@@ -204,25 +206,24 @@ class PyftraceMonitoring(PyftraceBase):
                 trace_this = True
 
         if trace_this and not self.is_tracer_code(filename):
-            if self.call_stack:
+            if self.call_stack and self.call_stack[-1][0] == func_name:
+                indent = "    " * self.current_depth()
+
                 stack_func_name, _ = self.call_stack[-1]
-            else:
-                stack_func_name = "<unknown>"
 
-            indent = "    " * (self.current_depth() - 1)
+                if self.show_path:
+                    file_info = f" @ {filename}" if filename else ""
+                else:
+                    file_info = ""
 
-            if self.show_path:
-                file_info = f" @ {filename}" if filename else ""
-            else:
-                file_info = ""
+                if stack_func_name == func_name:
+                    if not self.report_mode and self.output_stream:
+                        if self.max_depth is None or self.current_depth() <= self.max_depth:
+                            print(f"{indent}Returning {func_name}{file_info}", file=self.output_stream)
+                    if self.report_mode and func_name in self.execution_report:
+                        start_time, total_time, call_count = self.execution_report[func_name]
+                        exec_time = time.time() - start_time
+                        self.execution_report[func_name] = (start_time, total_time + exec_time, call_count)
 
-            if stack_func_name == func_name:
-                if not self.report_mode and self.output_stream:
-                    print(f"{indent}Returning {func_name}{file_info}", file=self.output_stream)
-                if self.report_mode and func_name in self.execution_report:
-                    start_time, total_time, call_count = self.execution_report[func_name]
-                    exec_time = time.time() - start_time
-                    self.execution_report[func_name] = (start_time, total_time + exec_time, call_count)
-                if self.call_stack and self.call_stack[-1][0] == func_name:
-                    self.call_stack.pop()
+                self.call_stack.pop()
 

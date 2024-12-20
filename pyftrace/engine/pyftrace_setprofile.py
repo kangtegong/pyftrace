@@ -124,7 +124,9 @@ class PyftraceSetprofile(PyftraceBase):
                     trace_this = True
 
         if trace_this:
+            self.call_stack.append(func_name)
             indent = "    " * self.current_depth()
+
             if not is_c_call and code:
                 func_def_lineno = code.co_firstlineno
             else:
@@ -153,9 +155,8 @@ class PyftraceSetprofile(PyftraceBase):
                 call_location = f"from line {call_lineno}"
 
             if not self.report_mode and self.output_stream:
-                print(f"{indent}Called {func_location} {call_location}", file=self.output_stream)
-
-            self.call_stack.append(func_name)
+                if self.max_depth is None or self.current_depth() <= self.max_depth:
+                    print(f"{indent}Called {func_location} {call_location}", file=self.output_stream)
 
             if self.report_mode:
                 start_time = time.time()
@@ -210,7 +211,6 @@ class PyftraceSetprofile(PyftraceBase):
                             trace_this = True
 
         if trace_this and self.call_stack and self.call_stack[-1] == func_name:
-            self.call_stack.pop()
             indent = "    " * self.current_depth()
 
             if self.show_path:
@@ -219,13 +219,16 @@ class PyftraceSetprofile(PyftraceBase):
                 file_info = ""
 
             if not self.report_mode and self.output_stream:
-                return_value = ''
-                if not is_c_return:
-                    return_value = f"-> {arg}"
-                print(f"{indent}Returning {func_name}{return_value}{file_info}", file=self.output_stream)
+                if self.max_depth is None or self.current_depth() <= self.max_depth:
+                    return_value = ''
+                    if not is_c_return:
+                        return_value = f"-> {arg}"
+                    print(f"{indent}Returning {func_name}{return_value}{file_info}", file=self.output_stream)
 
             if self.report_mode and func_name in self.execution_report:
                 start_time, total_time, call_count = self.execution_report[func_name]
                 exec_time = time.time() - start_time
                 self.execution_report[func_name] = (start_time, total_time + exec_time, call_count)
+
+            self.call_stack.pop()
 

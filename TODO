@@ -1,4 +1,3 @@
-- depth limit: --depth/-D <int> 
 - trace format using ├, │, ─ 
 - tui: fold/unfold
 - tui: '/' (search function)
