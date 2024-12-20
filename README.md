@@ -3,6 +3,13 @@
 
 [한국어](https://github.com/kangtegong/pyftrace/blob/main/README-ko.md)
 
+> [!NOTE]
+> **I hope to get a lot of use and feedback on this project.**
+>
+> **If you have any feedback, feel free to leave a comment.**
+>
+> **I hope you enjoy using this :)**
+
 # pyftrace
 
 ## Introduction
