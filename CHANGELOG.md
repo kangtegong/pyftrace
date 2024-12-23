@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.3.1] - 2024-12-23
+
+### Added
+- Introduce `-d`/`--depth` option:
+  - limit the tracing output to a specified call depth.
+
+### Changed
+- Change the output indentation.
+  - Changed to have at least one indentation by default when a trace is started.
+  - To distinguish it from the `print` statement of traced script.
+
+---
+
+
 ## [0.3.0] - 2024-12-19
 
 ### Added
