@@ -4,7 +4,7 @@ import time
 import weakref
 import sysconfig
 from ..tracer import PyftraceBase
-from ..utils import get_site_packages_modules, resolve_filename, get_line_number
+from ..utils import resolve_filename, get_line_number
 
 class PyftraceMonitoring(PyftraceBase):
     """

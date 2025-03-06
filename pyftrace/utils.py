@@ -2,18 +2,6 @@ import sys
 import os
 import weakref
 
-def get_site_packages_modules():
-    site_packages_dirs = [d for d in sys.path if 'site-packages' in d]
-    modules = set()
-    for directory in site_packages_dirs:
-        if os.path.isdir(directory):
-            for name in os.listdir(directory):
-                if os.path.isdir(os.path.join(directory, name)):
-                    modules.add(name.split('-')[0])
-                elif name.endswith('.dist-info'):
-                    modules.add(name.split('-')[0])
-    return modules
-
 def resolve_filename(code, callable_obj):
     filename = ''
     if code and code.co_filename:
