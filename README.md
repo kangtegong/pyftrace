@@ -19,6 +19,7 @@ Key features of pyftrace include:
 - **Execution Reports**: Generate reports detailing function execution times and call counts with the `--report` flag.
 - **Path Tracing**: Trace the path of traced Python file using the `--path` flag.
 - **TUI Mode**: Run pyftrace in a Text User Interface (TUI) mode using the `tui` command.
+- **Function Filtering**: Filter the function you want to track with the --function flag.
 
 ```
 $ pyftrace --help
@@ -27,14 +28,18 @@ usage: pyftrace [options] [tui] script [script_args ...]
 pyftrace: Python function tracing tool.
 
 positional arguments:
-  script         Path to the script to run and trace. Specify 'tui' before the script path to run in TUI mode.
+  script                Path to the script to run and trace. Specify 'tui' before the script path to run in TUI mode.
 
 options:
-  -h, --help     show this help message and exit
-  -V, --version  Show the version of pyftrace and exit
-  -v, --verbose  Enable built-in and third-party function tracing
-  -p, --path     Show file paths in tracing output
-  -r, --report   Generate a report of function execution times
+  -h, --help            show this help message and exit
+  -V, --version         Show the version of pyftrace and exit
+  -v, --verbose         Enable built-in and third-party function tracing
+  -p, --path            Show file paths in tracing output
+  -r, --report          Generate a report of function execution times
+  -d DEPTH, --depth DEPTH
+                        Limit the tracing output to DEPTH
+  -f FUNCTION, --function FUNCTION
+                        Trace only calls of <function> and its subcalls
 ```
 
 ## Usage
@@ -71,6 +76,8 @@ $ pip install pyftrace
 - `--path` or `-p`: Include file paths in the tracing output. 
 - `--help` or `-h`: Display help information about pyftrace and its options.
 - `--version` or `-V`: Display help information about pyftrace and its options.
+- `--depth` or `-d`: Limit the depth of the function to be traced. 
+- `--function` or `-f`: Filter the names of function to be traced.
 
 ## TUI
 

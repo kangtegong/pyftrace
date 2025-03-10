@@ -10,6 +10,10 @@ class PyftraceMonitoring(PyftraceBase):
     """
     sys.monitoring based tracer.
     """
+
+    def __init__(self, verbose, show_path, report_mode, output_stream, function_filter=None):
+        super().__init__(verbose, show_path, report_mode, output_stream, function_filter)
+
     def setup_tracing(self):
         self.tool_id = 1
         sys.monitoring.use_tool_id(self.tool_id, "pyftrace")
@@ -114,6 +118,16 @@ class PyftraceMonitoring(PyftraceBase):
                 if self.verbose and self.should_trace(def_filename):
                     trace_this = True
 
+        if self.function_filter:
+            if self.filter_depth == 0:
+                if func_name == self.function_filter and trace_this:
+                    self.filter_depth += 1
+                else:
+                    return
+            else:
+                if not trace_this:
+                    return
+
         if trace_this and not self.is_tracer_code(call_filename):
             self.call_stack.append((func_name, is_builtin))
             indent = "    " * self.current_depth()
@@ -153,6 +167,13 @@ class PyftraceMonitoring(PyftraceBase):
         # Skip tracing the '<module>' function's return event
         if func_name == '<module>':
             return
+
+        if self.function_filter:
+            if self.filter_depth > 0:
+                if func_name == self.function_filter:
+                    self.filter_depth -= 1
+            else:
+                return
 
         trace_this = self.should_trace(filename) or self.verbose
 

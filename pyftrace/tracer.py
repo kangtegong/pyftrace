@@ -8,7 +8,7 @@ class PyftraceBase(ABC):
     """
     Abstract base class defining the interface for tracers.
     """
-    def __init__(self, verbose=False, show_path=False, report_mode=False, output_stream=sys.stdout):
+    def __init__(self, verbose=False, show_path=False, report_mode=False, output_stream=sys.stdout, function_filter=None):
         self.script_name = None
         self.script_dir = None
         self.report_mode = report_mode
@@ -25,6 +25,9 @@ class PyftraceBase(ABC):
 
         # Get the standard library directory
         self.stdlib_dir = os.path.abspath(sysconfig.get_paths()["stdlib"])
+
+        self.function_filter = function_filter
+        self.filter_depth = 0
 
     @abstractmethod
     def setup_tracing(self):
@@ -79,9 +82,9 @@ class PyftraceBase(ABC):
 from .engine.pyftrace_monitoring import PyftraceMonitoring
 from .engine.pyftrace_setprofile import PyftraceSetprofile
 
-def get_tracer(verbose=False, show_path=False, report_mode=False, output_stream=sys.stdout):
+def get_tracer(verbose=False, show_path=False, report_mode=False, output_stream=sys.stdout, function_filter=None):
     if sys.version_info >= (3, 12):
-        return PyftraceMonitoring(verbose, show_path, report_mode, output_stream)
+        return PyftraceMonitoring(verbose, show_path, report_mode, output_stream, function_filter)
     else:
-        return PyftraceSetprofile(verbose, show_path, report_mode, output_stream)
+        return PyftraceSetprofile(verbose, show_path, report_mode, output_stream, function_filter)
 

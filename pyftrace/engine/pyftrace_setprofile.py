@@ -3,12 +3,16 @@ import os
 import time
 import sysconfig
 from ..tracer import PyftraceBase
-from ..utils import *
+from ..utils import resolve_filename, get_line_number, find_import_end_line
 
 class PyftraceSetprofile(PyftraceBase):
     """
     sys.setprofile based tracer
     """
+
+    def __init__(self, verbose, show_path, report_mode, output_stream, function_filter=None):
+        super().__init__(verbose, show_path, report_mode, output_stream, function_filter)
+
     def setup_tracing(self):
         sys.setprofile(self.profile_func)
 
@@ -48,7 +52,7 @@ class PyftraceSetprofile(PyftraceBase):
 
     def profile_func(self, frame, event, arg):
         if event == "call":
-            self.handle_call_event(frame, arg)
+            self.handle_call_event(frame, arg, is_c_call=False)
         elif event == "return":
             self.handle_return_event(frame, arg, is_c_return=False)
         elif event == "c_call":
@@ -123,6 +127,16 @@ class PyftraceSetprofile(PyftraceBase):
                 elif self.verbose and module_name == 'builtins':
                     trace_this = True
 
+        if self.function_filter:
+            if self.filter_depth == 0:
+                if func_name == self.function_filter and trace_this:
+                    self.filter_depth += 1
+                else:
+                    return
+            else:
+                if not trace_this:
+                    return
+
         if trace_this:
             self.call_stack.append(func_name)
             indent = "    " * self.current_depth()
@@ -191,6 +205,13 @@ class PyftraceSetprofile(PyftraceBase):
 
         if func_name == '<module>':
             return
+
+        if self.function_filter:
+            if self.filter_depth > 0:
+                if func_name == self.function_filter:
+                    self.filter_depth -= 1
+            else:
+                return
 
         trace_this = False
 

@@ -22,6 +22,7 @@ def main():
     parser.add_argument('-p', '--path', action='store_true', help="Show file paths in tracing output")
     parser.add_argument('-r', '--report', action='store_true', help="Generate a report of function execution times")
     parser.add_argument('-d', '--depth', type=int, help="Limit the tracing output to DEPTH")
+    parser.add_argument('-f', '--function', help="Trace only calls of <function> and its subcalls")
 
     parser.add_argument('script', nargs='+', help="Path to the script to run and trace. Specify 'tui' before the script path to run in TUI mode.")
 
@@ -47,6 +48,7 @@ def main():
         sys.exit(1)
 
     tracer_depth = args.depth if args.depth is not None else None
+    func_filter = args.function 
 
     if is_tui_mode:
         with tempfile.NamedTemporaryFile(mode="w+", delete=False) as temp_file:
@@ -54,7 +56,13 @@ def main():
 
         try:
             with open(temp_file_path, "w") as f:
-                tracer = get_tracer(verbose=args.verbose, show_path=args.path, report_mode=False, output_stream=f)
+                tracer = get_tracer(
+                    verbose=args.verbose,
+                    show_path=args.path,
+                    report_mode=False,
+                    output_stream=f,
+                    function_filter=func_filter
+                )
                 tracer.max_depth = tracer_depth
                 tracer.run_python_script(script_path, script_args)
             run_tui(temp_file_path)
@@ -63,7 +71,13 @@ def main():
             if os.path.exists(temp_file_path):
                 os.remove(temp_file_path)
     else:
-        tracer = get_tracer(verbose=args.verbose, show_path=args.path, report_mode=args.report)
+        tracer = get_tracer(
+            verbose=args.verbose,
+            show_path=args.path,
+            report_mode=args.report,
+            output_stream=sys.stdout,
+            function_filter=func_filter
+        )
         tracer.max_depth = tracer_depth
         tracer.run_python_script(script_path, script_args)
 

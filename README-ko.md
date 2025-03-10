@@ -14,6 +14,7 @@ pyftrace의 주요 기능:
 - **실행 보고서**: `--report` 옵션을 사용하여 함수 실행 시간 및 호출 횟수를 상세히 기록한 보고서를 생성합니다.
 - **경로 추적**: `--path` 옵션을 사용하여 추적된 Python 파일의 경로를 추적합니다.
 - **TUI 모드**: `tui` 명령을 사용하여 텍스트 사용자 인터페이스(TUI) 모드에서 pyftrace를 실행할 수 있습니다.
+- **함수 필터링**: `--function` 옵션을 사용하여 특정 함수와 해당 하위 호출을 추적할 수 있습니다.
 
 ```
 $ pyftrace --help
@@ -30,6 +31,10 @@ options:
   -v, --verbose  Enable built-in and third-party function tracing
   -p, --path     Show file paths in tracing output
   -r, --report   Generate a report of function execution times
+  -d DEPTH, --depth DEPTH
+                        Limit the tracing output to DEPTH
+  -f FUNCTION, --function FUNCTION
+                        Trace only calls of <function> and its subcalls
 ```
 
 ## 사용법
@@ -66,6 +71,8 @@ $ pip install pyftrace
 - `--path` 또는 `-p`: 추적 출력에 파일 경로를 포함합니다.
 - `--help` 또는 `-h`: pyftrace 및 해당 옵션에 대한 도움말 정보를 표시합니다.
 - `--version` 또는 `-V`: pyftrace 버전을 출력합니다.
+- `--depth` 또는 `-d`: 함수 호출 추적 깊이를 제한합니다.
+- `--function` 또는 `-f`: 특정 함수만 추적하고 해당 하위 호출을 모니터링합니다.
 
 ## TUI
 
