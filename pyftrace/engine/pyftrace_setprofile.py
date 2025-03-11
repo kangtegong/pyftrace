@@ -10,8 +10,8 @@ class PyftraceSetprofile(PyftraceBase):
     sys.setprofile based tracer
     """
 
-    def __init__(self, verbose, show_path, report_mode, output_stream, function_filter=None):
-        super().__init__(verbose, show_path, report_mode, output_stream, function_filter)
+    def __init__(self, verbose, show_path, report_mode, output_stream, function_filter=None, function_exclude=None):
+        super().__init__(verbose, show_path, report_mode, output_stream, function_filter, function_exclude)
 
     def setup_tracing(self):
         sys.setprofile(self.profile_func)
@@ -127,6 +127,12 @@ class PyftraceSetprofile(PyftraceBase):
                 elif self.verbose and module_name == 'builtins':
                     trace_this = True
 
+        if self.exclude_depth > 0:
+            return
+        if self.function_exclude and func_name == self.function_exclude:
+            self.exclude_depth += 1
+            return
+
         if self.function_filter:
             if self.filter_depth == 0:
                 if func_name == self.function_filter and trace_this:
@@ -206,12 +212,10 @@ class PyftraceSetprofile(PyftraceBase):
         if func_name == '<module>':
             return
 
-        if self.function_filter:
-            if self.filter_depth > 0:
-                if func_name == self.function_filter:
-                    self.filter_depth -= 1
-            else:
-                return
+        if self.exclude_depth > 0:
+            if self.function_exclude and func_name == self.function_exclude:
+                self.exclude_depth -= 1
+            return
 
         trace_this = False
 

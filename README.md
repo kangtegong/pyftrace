@@ -19,7 +19,7 @@ Key features of pyftrace include:
 - **Execution Reports**: Generate reports detailing function execution times and call counts with the `--report` flag.
 - **Path Tracing**: Trace the path of traced Python file using the `--path` flag.
 - **TUI Mode**: Run pyftrace in a Text User Interface (TUI) mode using the `tui` command.
-- **Function Filtering**: Filter the function you want to track with the --function flag.
+- **Function Filtering**: Filter the function you want to track with the `--function` and `--exclude-function` flag.
 
 ```
 $ pyftrace --help
@@ -40,6 +40,8 @@ options:
                         Limit the tracing output to DEPTH
   -f FUNCTION, --function FUNCTION
                         Trace only calls of <function> and its subcalls
+  -e EXCLUDE_FUNCTION, --exclude-function EXCLUDE_FUNCTION
+                        Exclude calls of <function> (and its subcalls) from tracing
 ```
 
 ## Usage
@@ -78,6 +80,7 @@ $ pip install pyftrace
 - `--version` or `-V`: Display help information about pyftrace and its options.
 - `--depth` or `-d`: Limit the depth of the function to be traced. 
 - `--function` or `-f`: Filter the names of function to be traced.
+- `--exclude-function` or `-e`: Exclude the specified function from the trace. 
 
 ## TUI
 

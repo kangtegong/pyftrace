@@ -1,7 +1,6 @@
 - trace format using ├, │, ─ 
 - tui: fold/unfold
 - tui: '/' (search function)
-- function-exclude filtering: --exclude-function/-e <string>
 - output format: -o/--output -O <filename> / sqlite dump
 - multiprocessing(pid) & multithreading(tid) tracing
 - argument tracing

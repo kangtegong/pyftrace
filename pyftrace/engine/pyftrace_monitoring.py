@@ -11,8 +11,8 @@ class PyftraceMonitoring(PyftraceBase):
     sys.monitoring based tracer.
     """
 
-    def __init__(self, verbose, show_path, report_mode, output_stream, function_filter=None):
-        super().__init__(verbose, show_path, report_mode, output_stream, function_filter)
+    def __init__(self, verbose, show_path, report_mode, output_stream, function_filter=None, function_exclude=None):
+        super().__init__(verbose, show_path, report_mode, output_stream, function_filter, function_exclude)
 
     def setup_tracing(self):
         self.tool_id = 1
@@ -118,6 +118,12 @@ class PyftraceMonitoring(PyftraceBase):
                 if self.verbose and self.should_trace(def_filename):
                     trace_this = True
 
+        if self.exclude_depth > 0:
+            return
+        if self.function_exclude and func_name == self.function_exclude:
+            self.exclude_depth += 1
+            return
+
         if self.function_filter:
             if self.filter_depth == 0:
                 if func_name == self.function_filter and trace_this:
@@ -168,14 +174,19 @@ class PyftraceMonitoring(PyftraceBase):
         if func_name == '<module>':
             return
 
+        if self.exclude_depth > 0:
+            if self.function_exclude and func_name == self.function_exclude:
+                self.exclude_depth -= 1
+            return
+
+        trace_this = self.should_trace(filename) or self.verbose
+
         if self.function_filter:
             if self.filter_depth > 0:
                 if func_name == self.function_filter:
                     self.filter_depth -= 1
             else:
                 return
-
-        trace_this = self.should_trace(filename) or self.verbose
 
         if trace_this and not self.is_tracer_code(filename):
             if self.call_stack and self.call_stack[-1][0] == func_name:
@@ -226,7 +237,12 @@ class PyftraceMonitoring(PyftraceBase):
             if self.verbose and self.should_trace(filename):
                 trace_this = True
 
-        if trace_this and not self.is_tracer_code(filename):
+        if self.exclude_depth > 0:
+            if self.function_exclude and func_name == self.function_exclude:
+                self.exclude_depth -= 1
+            return
+
+        if not self.is_tracer_code(filename) and trace_this:
             if self.call_stack and self.call_stack[-1][0] == func_name:
                 indent = "    " * self.current_depth()
 
