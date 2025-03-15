@@ -1,4 +1,3 @@
-- trace format using ├, │, ─ 
 - tui: fold/unfold
 - tui: '/' (search function)
 - output format: -o/--output -O <filename> / sqlite dump
