@@ -22,6 +22,7 @@ class PyftraceTests(unittest.TestCase):
         cls.module_a = os.path.join(cls.project_root, 'examples', 'module_trace', 'module_a.py')
         cls.module_b = os.path.join(cls.project_root, 'examples', 'module_trace', 'module_b.py')
         cls.add_script = os.path.join(cls.project_root, 'examples', 'add.py')
+        cls.temp_output = os.path.join(cls.project_root, 'tests', 'tmp_output.txt')
 
     def setUp(self):
         """
@@ -34,6 +35,11 @@ class PyftraceTests(unittest.TestCase):
         """
         Print output and error after each test.
         """
+        if os.path.exists(getattr(self, "temp_output", "")):
+            try:
+                os.remove(self.temp_output)
+            except Exception:
+                pass
         if self.output:
             print("\nSTDOUT:")
             print(self.output)
@@ -179,6 +185,28 @@ The sum of 3.0 and 5.0 is 8.0"""
         normalized_actual = self.normalize_output(result.stdout)
 
         self.assertEqual(normalized_expected, normalized_actual)
+        self.assertEqual(result.returncode, 0)
+
+    def test_output_file(self):
+        """
+        Test '--output' flag writes tracing to file.
+        """
+        args = ['--argument', '--output', self.temp_output, self.add_script, '2', '4']
+        result = self.run_pyftrace(args)
+
+        with open(self.temp_output, 'r') as f:
+            file_content = f.read()
+
+        normalized_file = self.normalize_output(file_content)
+        expected_output = f"""Running script: {self.add_script}
+    Called add (a=2.0, b=4.0) from line 18
+    Returning add-> 6.0
+The sum of 2.0 and 4.0 is 6.0"""
+
+        normalized_expected = self.normalize_output(expected_output)
+
+        self.assertEqual(normalized_expected, normalized_file)
+        self.assertEqual(result.stdout.strip(), "")  # output directed to file
         self.assertEqual(result.returncode, 0)
 
     # def test_tracing_script_path(self):

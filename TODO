@@ -1,5 +1,4 @@
 - tui: fold/unfold
 - tui: '/' (search function)
-- output format: -o/--output -O <filename> / sqlite dump
 - multiprocessing(pid) & multithreading(tid) tracing
 - add some useful real world examples

@@ -71,6 +71,7 @@ $ pip install pyftrace
 - `--report` 또는 `-r`: 스크립트 실행이 끝난 후 함수 실행 시간 및 호출 횟수 보고서를 생성합니다.
 - `--verbose` 또는 `-v`: 내장 함수(print, len 등)의 추적을 활성화합니다. 이 옵션 없이 사용될 경우 pyftrace는 사용자 정의 함수만 추적합니다.
 - `--argument` 또는 `-a`: Python 함수 인자를 출력합니다.
+- `--output` 또는 `-o <filename>`: 표준 출력 대신 파일로 트레이싱 결과를 기록합니다.
 - `--path` 또는 `-p`: 추적 출력에 파일 경로를 포함합니다.
 - `--help` 또는 `-h`: pyftrace 및 해당 옵션에 대한 도움말 정보를 표시합니다.
 - `--version` 또는 `-V`: pyftrace 버전을 출력합니다.

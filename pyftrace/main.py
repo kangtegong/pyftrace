@@ -1,5 +1,6 @@
 import sys
 import argparse
+import contextlib
 from .tracer import get_tracer
 from .tui import run_tui
 from . import __version__
@@ -25,6 +26,7 @@ def main():
     parser.add_argument('-f', '--function', help="Trace only calls of <function> and its subcalls")
     parser.add_argument('-e', '--exclude-function', help="Exclude calls of <function> (and its subcalls) from tracing")
     parser.add_argument('-a', '--argument', action='store_true', help="Show function arguments in tracing output (Python frames only)")
+    parser.add_argument('-o', '--output', help="Write tracing output to a file")
 
     parser.add_argument('script', nargs='+', help="Path to the script to run and trace. Specify 'tui' before the script path to run in TUI mode.")
 
@@ -53,44 +55,55 @@ def main():
     func_filter = args.function 
     func_exclude = args.exclude_function
 
-    if is_tui_mode:
-        with tempfile.NamedTemporaryFile(mode="w+", delete=False) as temp_file:
-            temp_file_path = temp_file.name
+    output_stream = sys.stdout
+    output_file_handle = None
+    if args.output:
+        output_file_handle = open(args.output, "w", encoding="utf-8")
+        output_stream = output_file_handle
 
-        try:
-            with open(temp_file_path, "w") as f:
-                tracer = get_tracer(
-                    verbose=args.verbose,
-                    show_path=args.path,
-                    report_mode=False,
-                    output_stream=f,
-                    function_filter=func_filter,
-                    function_exclude=func_exclude,
-                    trace_arguments=args.argument
-                )
-                tracer.max_depth = tracer_depth
+    try:
+        if is_tui_mode:
+            with tempfile.NamedTemporaryFile(mode="w+", delete=False) as temp_file:
+                temp_file_path = temp_file.name
+
+            try:
+                with open(temp_file_path, "w") as f:
+                    tracer = get_tracer(
+                        verbose=args.verbose,
+                        show_path=args.path,
+                        report_mode=False,
+                        output_stream=f,
+                        function_filter=func_filter,
+                        function_exclude=func_exclude,
+                        trace_arguments=args.argument
+                    )
+                    tracer.max_depth = tracer_depth
+                    tracer.run_python_script(script_path, script_args)
+                run_tui(temp_file_path)
+
+            finally:
+                if os.path.exists(temp_file_path):
+                    os.remove(temp_file_path)
+        else:
+            tracer = get_tracer(
+                verbose=args.verbose,
+                show_path=args.path,
+                report_mode=args.report,
+                output_stream=output_stream,
+                function_filter=func_filter,
+                function_exclude=func_exclude,
+                trace_arguments=args.argument
+            )
+            tracer.max_depth = tracer_depth
+            with contextlib.redirect_stdout(output_stream):
                 tracer.run_python_script(script_path, script_args)
-            run_tui(temp_file_path)
 
-        finally:
-            if os.path.exists(temp_file_path):
-                os.remove(temp_file_path)
-    else:
-        tracer = get_tracer(
-            verbose=args.verbose,
-            show_path=args.path,
-            report_mode=args.report,
-            output_stream=sys.stdout,
-            function_filter=func_filter,
-            function_exclude=func_exclude,
-            trace_arguments=args.argument
-        )
-        tracer.max_depth = tracer_depth
-        tracer.run_python_script(script_path, script_args)
-
-        if args.report:
-            tracer.print_report()
-            sys.exit(0)
+                if args.report:
+                    tracer.print_report(stream=output_stream)
+                    sys.exit(0)
+    finally:
+        if output_file_handle:
+            output_file_handle.close()
 
 if __name__ == "__main__":
     main()

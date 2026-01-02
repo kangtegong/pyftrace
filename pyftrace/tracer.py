@@ -44,14 +44,15 @@ class PyftraceBase(ABC):
     def run_python_script(self, script_path, script_args):
         pass
 
-    def print_report(self):
-        print("\nFunction Name\t| Total Execution Time\t| Call Count")
-        print("---------------------------------------------------------")
+    def print_report(self, stream=None):
+        stream = stream or self.output_stream or sys.stdout
+        print("\nFunction Name\t| Total Execution Time\t| Call Count", file=stream)
+        print("---------------------------------------------------------", file=stream)
         sorted_report = sorted(
             self.execution_report.items(), key=lambda item: item[1][1], reverse=True
         )
         for func_name, (_, total_time, call_count) in sorted_report:
-            print(f"{func_name:<15}\t| {total_time:.6f} seconds\t| {call_count}")
+            print(f"{func_name:<15}\t| {total_time:.6f} seconds\t| {call_count}", file=stream)
 
     def current_depth(self):
         return len(self.call_stack)
