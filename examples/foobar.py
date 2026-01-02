@@ -1,9 +1,9 @@
-def foo():
-    bar()
-    bar()
-    return 10
+def foo(x, y):
+    bar(x)
+    bar(y)
+    return x + y
 
-def bar():
-    return 20
+def bar(value):
+    return value * 2
 
-foo()
+foo(3, 7)

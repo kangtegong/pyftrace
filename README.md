@@ -75,6 +75,7 @@ $ pip install pyftrace
 
 - `--report` or `-r`: Generate a report of function execution times and call counts at the end of the script's execution.
 - `--verbose` or `-v`: Enable tracing of built-in functions (e.g., print, len). Without this flag, pyftrace only traces user-defined functions.
+- `--argument` or `-a`: Show function arguments for Python functions.
 - `--path` or `-p`: Include file paths in the tracing output. 
 - `--help` or `-h`: Display help information about pyftrace and its options.
 - `--version` or `-V`: Display help information about pyftrace and its options.

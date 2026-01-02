@@ -24,6 +24,7 @@ def main():
     parser.add_argument('-d', '--depth', type=int, help="Limit the tracing output to DEPTH")
     parser.add_argument('-f', '--function', help="Trace only calls of <function> and its subcalls")
     parser.add_argument('-e', '--exclude-function', help="Exclude calls of <function> (and its subcalls) from tracing")
+    parser.add_argument('-a', '--argument', action='store_true', help="Show function arguments in tracing output (Python frames only)")
 
     parser.add_argument('script', nargs='+', help="Path to the script to run and trace. Specify 'tui' before the script path to run in TUI mode.")
 
@@ -64,7 +65,8 @@ def main():
                     report_mode=False,
                     output_stream=f,
                     function_filter=func_filter,
-                    function_exclude=func_exclude
+                    function_exclude=func_exclude,
+                    trace_arguments=args.argument
                 )
                 tracer.max_depth = tracer_depth
                 tracer.run_python_script(script_path, script_args)
@@ -80,7 +82,8 @@ def main():
             report_mode=args.report,
             output_stream=sys.stdout,
             function_filter=func_filter,
-            function_exclude=func_exclude
+            function_exclude=func_exclude,
+            trace_arguments=args.argument
         )
         tracer.max_depth = tracer_depth
         tracer.run_python_script(script_path, script_args)

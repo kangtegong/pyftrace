@@ -2,5 +2,4 @@
 - tui: '/' (search function)
 - output format: -o/--output -O <filename> / sqlite dump
 - multiprocessing(pid) & multithreading(tid) tracing
-- argument tracing
 - add some useful real world examples

@@ -3,15 +3,15 @@ import os
 import time
 import sysconfig
 from ..tracer import PyftraceBase
-from ..utils import resolve_filename, get_line_number, find_import_end_line
+from ..utils import resolve_filename, get_line_number, find_import_end_line, format_arguments
 
 class PyftraceSetprofile(PyftraceBase):
     """
     sys.setprofile based tracer
     """
 
-    def __init__(self, verbose, show_path, report_mode, output_stream, function_filter=None, function_exclude=None):
-        super().__init__(verbose, show_path, report_mode, output_stream, function_filter, function_exclude)
+    def __init__(self, verbose, show_path, report_mode, output_stream, function_filter=None, function_exclude=None, trace_arguments=False):
+        super().__init__(verbose, show_path, report_mode, output_stream, function_filter, function_exclude, trace_arguments)
 
     def setup_tracing(self):
         sys.setprofile(self.profile_func)
@@ -174,9 +174,15 @@ class PyftraceSetprofile(PyftraceBase):
                 func_location = func_name
                 call_location = f"from line {call_lineno}"
 
+            arg_suffix = ""
+            if self.trace_arguments and not is_c_call and code:
+                arg_display = format_arguments(frame)
+                if arg_display:
+                    arg_suffix = f" ({arg_display})"
+
             if not self.report_mode and self.output_stream:
                 if self.max_depth is None or self.current_depth() <= self.max_depth:
-                    print(f"{indent}Called {func_location} {call_location}", file=self.output_stream)
+                    print(f"{indent}Called {func_location}{arg_suffix} {call_location}", file=self.output_stream)
 
             if self.report_mode:
                 start_time = time.time()

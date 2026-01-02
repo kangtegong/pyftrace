@@ -21,6 +21,7 @@ class PyftraceTests(unittest.TestCase):
         cls.main_script = os.path.join(cls.project_root, 'examples', 'module_trace', 'main_script.py')
         cls.module_a = os.path.join(cls.project_root, 'examples', 'module_trace', 'module_a.py')
         cls.module_b = os.path.join(cls.project_root, 'examples', 'module_trace', 'module_b.py')
+        cls.add_script = os.path.join(cls.project_root, 'examples', 'add.py')
 
     def setUp(self):
         """
@@ -155,6 +156,24 @@ class PyftraceTests(unittest.TestCase):
     Results: ret_a, ret_b
         Returning print
     Returning main-> None"""
+
+        normalized_expected = self.normalize_output(expected_output)
+        normalized_actual = self.normalize_output(result.stdout)
+
+        self.assertEqual(normalized_expected, normalized_actual)
+        self.assertEqual(result.returncode, 0)
+
+    def test_argument_tracing(self):
+        """
+        Test '--argument' flag for showing function arguments.
+        """
+        args = ['--argument', self.add_script, '3', '5']
+        result = self.run_pyftrace(args)
+
+        expected_output = f"""Running script: {self.add_script}
+    Called add (a=3.0, b=5.0) from line 18
+    Returning add-> 8.0
+The sum of 3.0 and 5.0 is 8.0"""
 
         normalized_expected = self.normalize_output(expected_output)
         normalized_actual = self.normalize_output(result.stdout)

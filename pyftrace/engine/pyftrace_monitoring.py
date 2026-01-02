@@ -11,8 +11,8 @@ class PyftraceMonitoring(PyftraceBase):
     sys.monitoring based tracer.
     """
 
-    def __init__(self, verbose, show_path, report_mode, output_stream, function_filter=None, function_exclude=None):
-        super().__init__(verbose, show_path, report_mode, output_stream, function_filter, function_exclude)
+    def __init__(self, verbose, show_path, report_mode, output_stream, function_filter=None, function_exclude=None, trace_arguments=False):
+        super().__init__(verbose, show_path, report_mode, output_stream, function_filter, function_exclude, trace_arguments)
 
     def setup_tracing(self):
         self.tool_id = 1

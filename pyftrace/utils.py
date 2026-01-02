@@ -1,6 +1,7 @@
 import sys
 import os
 import weakref
+from typing import List
 
 def resolve_filename(code, callable_obj):
     filename = ''
@@ -43,4 +44,61 @@ def find_import_end_line(script_path):
         return max(import_line_numbers)
     else:
         return 0
+
+
+def format_arguments(frame) -> str:
+    """
+    Safely format function arguments from the current frame.
+    Falls back gracefully if arguments are unavailable.
+    """
+    if frame is None or frame.f_code is None:
+        return ""
+
+    code = frame.f_code
+    arg_names: List[str] = []
+
+    argcount = code.co_argcount
+    kwonly = code.co_kwonlyargcount
+    varnames = code.co_varnames
+
+    # Positional-only + positional-or-keyword arguments
+    for i in range(argcount):
+        if i < len(varnames):
+            arg_names.append(varnames[i])
+
+    idx = argcount
+
+    # *args
+    has_varargs = bool(code.co_flags & 0x04)
+    if has_varargs and idx < len(varnames):
+        arg_names.append(varnames[idx])
+        idx += 1
+
+    # Keyword-only
+    for i in range(kwonly):
+        if idx < len(varnames):
+            arg_names.append(varnames[idx])
+            idx += 1
+
+    # **kwargs
+    has_varkw = bool(code.co_flags & 0x08)
+    if has_varkw and idx < len(varnames):
+        arg_names.append(varnames[idx])
+
+    parts = []
+    locals_ = frame.f_locals or {}
+
+    def safe_repr(value):
+        try:
+            return repr(value)
+        except Exception:
+            return f"<unreprable {type(value).__name__}>"
+
+    for name in arg_names:
+        if name in locals_:
+            parts.append(f"{name}={safe_repr(locals_[name])}")
+        else:
+            parts.append(f"{name}=<unset>")
+
+    return ", ".join(parts)
 

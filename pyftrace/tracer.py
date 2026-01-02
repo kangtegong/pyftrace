@@ -8,7 +8,7 @@ class PyftraceBase(ABC):
     """
     Abstract base class defining the interface for tracers.
     """
-    def __init__(self, verbose=False, show_path=False, report_mode=False, output_stream=sys.stdout, function_filter=None, function_exclude=None):
+    def __init__(self, verbose=False, show_path=False, report_mode=False, output_stream=sys.stdout, function_filter=None, function_exclude=None, trace_arguments=False):
         self.script_name = None
         self.script_dir = None
         self.report_mode = report_mode
@@ -22,6 +22,7 @@ class PyftraceBase(ABC):
         self.output_stream = output_stream
         self.import_end_line = 0
         self.max_depth = None
+        self.trace_arguments = trace_arguments
 
         # Get the standard library directory
         self.stdlib_dir = os.path.abspath(sysconfig.get_paths()["stdlib"])
@@ -84,9 +85,13 @@ class PyftraceBase(ABC):
 from .engine.pyftrace_monitoring import PyftraceMonitoring
 from .engine.pyftrace_setprofile import PyftraceSetprofile
 
-def get_tracer(verbose=False, show_path=False, report_mode=False, output_stream=sys.stdout, function_filter=None, function_exclude=None):
+def get_tracer(verbose=False, show_path=False, report_mode=False, output_stream=sys.stdout, function_filter=None, function_exclude=None, trace_arguments=False):
+    # Argument tracing requires access to frame locals, which is only available
+    # in the setprofile-based tracer. Prefer it when trace_arguments is enabled.
+    if trace_arguments:
+        return PyftraceSetprofile(verbose, show_path, report_mode, output_stream, function_filter, function_exclude, trace_arguments)
     if sys.version_info >= (3, 12):
-        return PyftraceMonitoring(verbose, show_path, report_mode, output_stream, function_filter, function_exclude)
+        return PyftraceMonitoring(verbose, show_path, report_mode, output_stream, function_filter, function_exclude, trace_arguments)
     else:
-        return PyftraceSetprofile(verbose, show_path, report_mode, output_stream, function_filter, function_exclude)
+        return PyftraceSetprofile(verbose, show_path, report_mode, output_stream, function_filter, function_exclude, trace_arguments)
 
