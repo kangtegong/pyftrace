@@ -33,6 +33,17 @@ def callable_name(callable_obj):
         return name
     return type(callable_obj).__name__
 
+def format_exception(exception):
+    """
+    Describe an exception like the last line of a traceback does.
+    """
+    name = type(exception).__name__
+    try:
+        message = str(exception)
+    except Exception:
+        return name
+    return f"{name}: {message}" if message else name
+
 def get_line_number(code, instruction_offset):
     if code is None:
         return 0

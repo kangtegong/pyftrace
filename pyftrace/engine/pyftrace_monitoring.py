@@ -5,6 +5,7 @@ import weakref
 import sysconfig
 from ..tracer import PyftraceBase
 from ..utils import resolve_filename, get_line_number, callable_name
+from ..utils import format_exception
 
 class PyftraceMonitoring(PyftraceBase):
     """
@@ -20,11 +21,13 @@ class PyftraceMonitoring(PyftraceBase):
         sys.monitoring.register_callback(self.tool_id, sys.monitoring.events.CALL, self.monitor_call)
         sys.monitoring.register_callback(self.tool_id, sys.monitoring.events.PY_RETURN, self.monitor_py_return)
         sys.monitoring.register_callback(self.tool_id, sys.monitoring.events.C_RETURN, self.monitor_c_return)
+        sys.monitoring.register_callback(self.tool_id, sys.monitoring.events.PY_UNWIND, self.monitor_py_unwind)
         sys.monitoring.register_callback(self.tool_id, sys.monitoring.events.C_RAISE, self.monitor_c_raise)
         sys.monitoring.set_events(
             self.tool_id,
             sys.monitoring.events.CALL |
             sys.monitoring.events.PY_RETURN |
+            sys.monitoring.events.PY_UNWIND |
             sys.monitoring.events.C_RETURN |
             sys.monitoring.events.C_RAISE
         )
@@ -42,8 +45,12 @@ class PyftraceMonitoring(PyftraceBase):
     def monitor_c_return(self, code, instruction_offset, callable_obj, arg0):
         self.handle_c_return_event(code, instruction_offset, callable_obj)
 
+    def monitor_py_unwind(self, code, instruction_offset, exception):
+        self.handle_py_return_event(code, instruction_offset, None, exception)
+
     def monitor_c_raise(self, code, instruction_offset, callable_obj, arg0):
-        pass  # Placeholder for handling C_RAISE events
+        self.handle_c_return_event(code, instruction_offset, callable_obj,
+                                   raised=True)
 
     def handle_call_event(self, code, instruction_offset, callable_obj):
         if not self.tracing_started:
@@ -133,7 +140,7 @@ class PyftraceMonitoring(PyftraceBase):
                 else:
                     self.execution_report[func_name] = (start_time, 0, 1)
 
-    def handle_py_return_event(self, code, instruction_offset, retval):
+    def handle_py_return_event(self, code, instruction_offset, retval, exception=None):
         if not self.tracing_started:
             return
 
@@ -171,7 +178,10 @@ class PyftraceMonitoring(PyftraceBase):
                     file_info = ""
 
                 if stack_func_name == func_name:
-                    if self.should_emit():
+                    if self.should_emit() and exception is not None:
+                        detail = format_exception(exception)
+                        self.emit(f"{indent}Raised {func_name}-> {detail}{file_info}")
+                    elif self.should_emit():
                         self.emit(f"{indent}Returning {func_name}-> {retval}{file_info}")
 
                     if self.report_mode and func_name in self.execution_report:
@@ -181,7 +191,7 @@ class PyftraceMonitoring(PyftraceBase):
 
                 self.call_stack.pop()
 
-    def handle_c_return_event(self, code, instruction_offset, callable_obj):
+    def handle_c_return_event(self, code, instruction_offset, callable_obj, raised=False):
         if not self.tracing_started:
             return
 
@@ -226,7 +236,8 @@ class PyftraceMonitoring(PyftraceBase):
 
                 if stack_func_name == func_name:
                     if self.should_emit():
-                        self.emit(f"{indent}Returning {func_name}{file_info}")
+                        verb = "Raised" if raised else "Returning"
+                        self.emit(f"{indent}{verb} {func_name}{file_info}")
                     if self.report_mode and func_name in self.execution_report:
                         start_time, total_time, call_count = self.execution_report[func_name]
                         exec_time = time.time() - start_time
