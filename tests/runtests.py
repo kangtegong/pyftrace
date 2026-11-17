@@ -1248,6 +1248,125 @@ class RegressionTests(PyftraceTestCase):
                          self.trace_lines(result.stdout))
         self.assertEqual(result.returncode, 7)
 
+class ConcurrencyTests(PyftraceTestCase):
+    """
+    Threads and child processes.
+    """
+
+    def test_thread_outlives_script(self):
+        """
+        Test that a thread is traced after the script has run to its end.
+        """
+        result = self.run_source("""
+            import threading
+            import time
+
+            def done():
+                return "done"
+
+            def late():
+                time.sleep(0.2)
+                return done()
+
+            threading.Thread(target=late).start()
+        """)
+        lines = [re.sub(r" from line \d+", "", line)
+                 for line in self.trace_lines(result.stdout)]
+
+        self.assertEqual([
+            "[tid N]     Called late",
+            "[tid N]         Called done",
+            "[tid N]         Returning done-> done",
+            "[tid N]     Returning late-> done",
+        ], lines)
+
+    def test_thread_json(self):
+        """
+        Test that '--format json' carries the thread id as a field.
+        """
+        args = ['--format', 'json', self.threads_script]
+        result = self.run_pyftrace(args)
+        events = [json.loads(line) for line in result.stdout.splitlines()]
+        tids = {event.get("tid") for event in events if "depth" in event}
+
+        # The main thread has none, the worker thread has a number
+        self.assertEqual(2, len(tids))
+        self.assertIn(None, tids)
+        self.assertTrue(all(isinstance(event["tid"], int)
+                            for event in events if "tid" in event))
+
+    @unittest.skipUnless(hasattr(os, "fork"), "os.fork() is not available")
+    def test_fork(self):
+        """
+        Test that a forked process is traced under its own pid.
+        """
+        result = self.run_source("""
+            import os
+
+            def child_work():
+                return "child"
+
+            def parent_work():
+                return "parent"
+
+            def main():
+                pid = os.fork()
+                if pid == 0:
+                    child_work()
+                    os._exit(0)
+                os.waitpid(pid, 0)
+                return parent_work()
+
+            main()
+        """)
+
+        self.assertEqual([
+            "    Called main from line 18",
+            "[pid N]     Called child_work from line 13",
+            "[pid N]     Returning child_work-> child",
+            "        Called parent_work from line 16",
+            "        Returning parent_work-> parent",
+            "    Returning main-> parent",
+        ], self.trace_lines(result.stdout))
+
+    POOL_SCRIPT = """
+        import multiprocessing
+
+        def square(n):
+            return n * n
+
+        def main():
+            with multiprocessing.Pool(2) as pool:
+                return pool.map(square, [1, 2, 3])
+
+        if __name__ == "__main__":
+            main()
+    """
+
+    def test_pool(self):
+        """
+        Test that the function a multiprocessing pool runs is traced.
+        """
+        result = self.run_source(self.POOL_SCRIPT)
+        lines = [re.sub(r" from line \d+", "", line)
+                 for line in self.trace_lines(result.stdout)]
+
+        self.assertEqual(3, lines.count("[pid N]     Called square"))
+        for value in (1, 4, 9):
+            self.assertIn(f"[pid N]     Returning square-> {value}", lines)
+        self.assertEqual(result.returncode, 0)
+
+    def test_pool_report(self):
+        """
+        Test that '--report' includes pool workers, which are killed.
+        """
+        result = self.run_source(self.POOL_SCRIPT,
+                                 ['--report', '--format', 'json'])
+        rows = self.report_calls(result)
+
+        self.assertEqual(3, rows["square"]["calls"])
+        self.assertEqual("", result.stderr)
+
 def has_module(name):
     return importlib.util.find_spec(name) is not None
 
