@@ -122,9 +122,8 @@ class PyftraceMonitoring(PyftraceBase):
                 call_location = f"from line {call_lineno}"
 
             # Check depth limit
-            if not self.report_mode and self.output_stream:
-                if self.max_depth is None or self.current_depth() <= self.max_depth:
-                    print(f"{indent}Called {func_location} {call_location}", file=self.output_stream)
+            if self.should_emit():
+                self.emit(f"{indent}Called {func_location} {call_location}")
 
             if self.report_mode:
                 start_time = time.time()
@@ -172,9 +171,8 @@ class PyftraceMonitoring(PyftraceBase):
                     file_info = ""
 
                 if stack_func_name == func_name:
-                    if not self.report_mode and self.output_stream:
-                        if self.max_depth is None or self.current_depth() <= self.max_depth:
-                            print(f"{indent}Returning {func_name}-> {retval}{file_info}", file=self.output_stream)
+                    if self.should_emit():
+                        self.emit(f"{indent}Returning {func_name}-> {retval}{file_info}")
 
                     if self.report_mode and func_name in self.execution_report:
                         start_time, total_time, call_count = self.execution_report[func_name]
@@ -227,9 +225,8 @@ class PyftraceMonitoring(PyftraceBase):
                     file_info = ""
 
                 if stack_func_name == func_name:
-                    if not self.report_mode and self.output_stream:
-                        if self.max_depth is None or self.current_depth() <= self.max_depth:
-                            print(f"{indent}Returning {func_name}{file_info}", file=self.output_stream)
+                    if self.should_emit():
+                        self.emit(f"{indent}Returning {func_name}{file_info}")
                     if self.report_mode and func_name in self.execution_report:
                         start_time, total_time, call_count = self.execution_report[func_name]
                         exec_time = time.time() - start_time

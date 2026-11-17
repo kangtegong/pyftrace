@@ -148,9 +148,8 @@ class PyftraceSetprofile(PyftraceBase):
                 if arg_display:
                     arg_suffix = f" ({arg_display})"
 
-            if not self.report_mode and self.output_stream:
-                if self.max_depth is None or self.current_depth() <= self.max_depth:
-                    print(f"{indent}Called {func_location}{arg_suffix} {call_location}", file=self.output_stream)
+            if self.should_emit():
+                self.emit(f"{indent}Called {func_location}{arg_suffix} {call_location}")
 
             if self.report_mode:
                 start_time = time.time()
@@ -217,12 +216,11 @@ class PyftraceSetprofile(PyftraceBase):
             else:
                 file_info = ""
 
-            if not self.report_mode and self.output_stream:
-                if self.max_depth is None or self.current_depth() <= self.max_depth:
-                    return_value = ''
-                    if not is_c_return:
-                        return_value = f"-> {arg}"
-                    print(f"{indent}Returning {func_name}{return_value}{file_info}", file=self.output_stream)
+            if self.should_emit():
+                return_value = ''
+                if not is_c_return:
+                    return_value = f"-> {arg}"
+                self.emit(f"{indent}Returning {func_name}{return_value}{file_info}")
 
             if self.report_mode and func_name in self.execution_report:
                 start_time, total_time, call_count = self.execution_report[func_name]

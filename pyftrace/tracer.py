@@ -111,6 +111,18 @@ class PyftraceBase(ABC):
     def current_depth(self):
         return len(self.call_stack)
 
+    def should_emit(self):
+        """
+        True if a trace line at the current depth is to be printed.
+        Check this before formatting the line.
+        """
+        if self.report_mode or not self.output_stream:
+            return False
+        return self.max_depth is None or self.current_depth() <= self.max_depth
+
+    def emit(self, line):
+        print(line, file=self.output_stream)
+
     def should_trace(self, file_name):
         if not file_name:
             return False
