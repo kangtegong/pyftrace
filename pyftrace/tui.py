@@ -26,10 +26,10 @@ def tui_main(stdscr, trace_lines):
         curses.cbreak()     # Process key input immediately
         stdscr.keypad(True) # Allow special key input
 
+        # curses.wrapper() restores the terminal on the way out, and the
+        # message of sys.exit() is printed after that
         if not curses.has_colors():
-            curses.endwin()
-            print("Terminal does not support colors.")
-            sys.exit(1)
+            sys.exit("Terminal does not support colors.")
 
         curses.start_color()
         curses.use_default_colors()
@@ -71,9 +71,7 @@ def tui_main(stdscr, trace_lines):
         min_height = 20
         min_width = 60
         if height < min_height or width < min_width:
-            curses.endwin()
-            print(f"Terminal size is too small. Minimum size: {min_width}x{min_height}")
-            sys.exit(1)
+            sys.exit(f"Terminal size is too small. Minimum size: {min_width}x{min_height}")
 
         # Set window size and position
         display_height = height - 12  # Leave enough space
@@ -358,5 +356,4 @@ def tui_main(stdscr, trace_lines):
         curses.nocbreak()
         stdscr.keypad(False)
         curses.echo()
-        curses.endwin()
 
