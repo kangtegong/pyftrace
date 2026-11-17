@@ -98,6 +98,8 @@ class PyftraceBase(ABC):
     def should_trace(self, file_name):
         if not file_name:
             return False
+        if self.is_pseudo_file(file_name):
+            return False
         abs_file_name = os.path.abspath(file_name)
         if self.is_tracer_code(abs_file_name):
             return False
@@ -106,6 +108,15 @@ class PyftraceBase(ABC):
         if not self.verbose and self.is_site_code(abs_file_name):
             return False
         return True
+
+    @staticmethod
+    def is_pseudo_file(file_name):
+        """
+        True for code without a source file, such as '<string>' or
+        '<frozen posixpath>'.  Callers may pass the name through
+        os.path.abspath() first, so only look at the last component.
+        """
+        return os.path.basename(file_name).startswith('<')
 
     def is_tracer_code(self, file_name):
         if not file_name:
@@ -132,7 +143,7 @@ class PyftraceBase(ABC):
     def is_stdlib_code(self, file_name):
         if not file_name:
             return False
-        if file_name.startswith('<frozen'):
+        if os.path.basename(file_name).startswith('<frozen'):
             return True  # Exclude frozen modules
         abs_file_name = os.path.normcase(os.path.abspath(file_name))
         stdlib_dir_norm = os.path.normcase(self.stdlib_dir)
