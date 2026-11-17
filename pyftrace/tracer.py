@@ -3,7 +3,7 @@ import os
 import site
 import sysconfig
 from abc import ABC, abstractmethod
-from .utils import resolve_filename, get_line_number
+from .utils import find_import_end_line
 
 class PyftraceBase(ABC):
     """
@@ -42,9 +42,45 @@ class PyftraceBase(ABC):
     def cleanup_tracing(self):
         pass
 
-    @abstractmethod
+    def run_traced(self, target_path, argv, run):
+        """
+        Call run() with tracing enabled.  target_path is the file whose
+        top-level code starts the trace.
+        """
+        self.script_name = os.path.abspath(target_path)
+        self.script_dir = os.path.dirname(self.script_name)
+
+        # The setprofile engine starts tracing after the imports
+        self.import_end_line = find_import_end_line(target_path)
+
+        old_sys_path = sys.path.copy()
+        old_sys_argv = sys.argv.copy()
+        sys.argv = argv
+
+        self.tracing_started = False
+        self.setup_tracing()
+
+        try:
+            run()
+        finally:
+            self.tracing_started = False
+            self.cleanup_tracing()
+            sys.path = old_sys_path
+            sys.argv = old_sys_argv
+
     def run_python_script(self, script_path, script_args):
-        pass
+        if self.output_stream:
+            print(f"Running script: {script_path}", file=self.output_stream)
+
+        with open(script_path, "r") as file:
+            code_object = compile(file.read(), script_path, 'exec')
+        script_globals = {"__file__": script_path, "__name__": "__main__"}
+
+        def run():
+            sys.path.insert(0, self.script_dir)
+            exec(code_object, script_globals)
+
+        self.run_traced(script_path, [script_path] + script_args, run)
 
     def print_report(self, stream=None):
         stream = stream or self.output_stream or sys.stdout

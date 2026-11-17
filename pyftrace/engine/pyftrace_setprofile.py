@@ -3,7 +3,7 @@ import os
 import time
 import sysconfig
 from ..tracer import PyftraceBase
-from ..utils import resolve_filename, get_line_number, find_import_end_line, format_arguments
+from ..utils import resolve_filename, format_arguments
 
 class PyftraceSetprofile(PyftraceBase):
     """
@@ -18,37 +18,6 @@ class PyftraceSetprofile(PyftraceBase):
 
     def cleanup_tracing(self):
         sys.setprofile(None)
-
-    def run_python_script(self, script_path, script_args):
-        if self.output_stream:
-            print(f"Running script: {script_path}", file=self.output_stream)
-
-        self.script_name = os.path.abspath(script_path)
-        self.script_dir = os.path.dirname(self.script_name)
-
-        # For use import_end_line to start tracing after imports
-        self.import_end_line = find_import_end_line(script_path)
-
-        with open(script_path, "r") as file:
-            script_code = file.read()
-            code_object = compile(script_code, script_path, 'exec')
-
-        old_sys_path = sys.path.copy()
-        old_sys_argv = sys.argv.copy()
-        sys.path.insert(0, self.script_dir)
-        sys.argv = [script_path] + script_args
-
-        self.tracing_started = False
-
-        self.setup_tracing()
-
-        try:
-            exec(code_object, {"__file__": script_path, "__name__": "__main__"})
-        finally:
-            self.tracing_started = False
-            self.cleanup_tracing()
-            sys.path = old_sys_path
-            sys.argv = old_sys_argv
 
     def profile_func(self, frame, event, arg):
         if event == "call":

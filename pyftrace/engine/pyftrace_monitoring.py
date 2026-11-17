@@ -33,33 +33,6 @@ class PyftraceMonitoring(PyftraceBase):
         sys.monitoring.free_tool_id(self.tool_id)
         self.output_stream = None
 
-    def run_python_script(self, script_path, script_args):
-        if self.output_stream:
-            print(f"Running script: {script_path}", file=self.output_stream)
-
-        self.script_name = os.path.abspath(script_path)
-        self.script_dir = os.path.dirname(self.script_name)
-
-        with open(script_path, "r") as file:
-            script_code = file.read()
-            code_object = compile(script_code, script_path, 'exec')
-
-        old_sys_path = sys.path.copy()
-        old_sys_argv = sys.argv.copy()
-        sys.path.insert(0, self.script_dir)
-        sys.argv = [script_path] + script_args
-
-        self.tracing_started = False
-
-        self.setup_tracing()
-
-        try:
-            exec(code_object, {"__file__": script_path, "__name__": "__main__"})
-        finally:
-            self.cleanup_tracing()
-            sys.path = old_sys_path
-            sys.argv = old_sys_argv
-
     def monitor_call(self, code, instruction_offset, callable_obj, arg0):
         self.handle_call_event(code, instruction_offset, callable_obj)
 
