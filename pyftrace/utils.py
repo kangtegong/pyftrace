@@ -1,6 +1,7 @@
 import sys
 import os
 import weakref
+import importlib.util
 from typing import List
 
 def resolve_filename(code, callable_obj):
@@ -54,6 +55,21 @@ def find_import_end_line(script_path):
         return max(import_line_numbers)
     else:
         return 0
+
+
+def find_module_file(module_name):
+    """
+    Return the file that 'python -m module_name' would run, or None.
+    """
+    try:
+        spec = importlib.util.find_spec(module_name)
+        if spec and spec.submodule_search_locations is not None:
+            spec = importlib.util.find_spec(module_name + ".__main__")
+    except ImportError:
+        return None
+    if spec is None or not spec.has_location:
+        return None
+    return spec.origin
 
 
 def format_arguments(frame) -> str:

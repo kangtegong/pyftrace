@@ -1,9 +1,10 @@
 import sys
 import os
+import runpy
 import site
 import sysconfig
 from abc import ABC, abstractmethod
-from .utils import find_import_end_line
+from .utils import find_import_end_line, find_module_file
 
 class PyftraceBase(ABC):
     """
@@ -83,6 +84,19 @@ class PyftraceBase(ABC):
             exec(code_object, script_globals)
 
         self.run_traced(script_path, [script_path] + script_args, run)
+
+    def run_python_module(self, module_name, module_args):
+        module_path = find_module_file(module_name)
+        if module_path is None:
+            raise ImportError(f"No module named {module_name}")
+
+        if self.output_stream:
+            print(f"Running module: {module_name}", file=self.output_stream)
+
+        def run():
+            runpy.run_module(module_name, run_name="__main__", alter_sys=True)
+
+        self.run_traced(module_path, [module_path] + module_args, run)
 
     def print_report(self, stream=None):
         stream = stream or self.output_stream or sys.stdout

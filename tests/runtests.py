@@ -209,6 +209,43 @@ The sum of 2.0 and 4.0 is 6.0"""
         self.assertEqual(result.stdout.strip(), "")  # output directed to file
         self.assertEqual(result.returncode, 0)
 
+    def test_module(self):
+        """
+        Test '-m' flag for tracing a module.
+        """
+        args = ['-m', 'examples.add', '3', '5']
+        result = self.run_pyftrace(args)
+
+        expected_output = """Running module: examples.add
+    Called add from line 18
+    Returning add-> 8.0
+The sum of 3.0 and 5.0 is 8.0"""
+
+        normalized_expected = self.normalize_output(expected_output)
+        normalized_actual = self.normalize_output(result.stdout)
+
+        self.assertEqual(normalized_expected, normalized_actual)
+        self.assertEqual(result.returncode, 0)
+
+    def test_module_arguments(self):
+        """
+        Test that options after '-m <module>' go to the module.
+        """
+        args = ['-m', 'examples.add', '3', '5', '--verbose']
+        result = self.run_pyftrace(args)
+
+        self.assertIn("Usage: python add.py", result.stdout)
+        self.assertEqual(result.returncode, 1)
+
+    def test_module_not_found(self):
+        """
+        Test '-m' flag with a module that does not exist.
+        """
+        result = self.run_pyftrace(['-m', 'examples.no_such_module'])
+
+        self.assertIn("No module named", result.stdout)
+        self.assertEqual(result.returncode, 1)
+
     # def test_tracing_script_path(self):
     #     """
     #     Test '--path' flag to include file paths in tracing.
