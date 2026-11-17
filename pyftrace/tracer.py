@@ -472,10 +472,6 @@ def tracer_from_config(config):
     return tracer
 
 def get_tracer(verbose=False, show_path=False, report_mode=False, output_stream=sys.stdout, function_filter=None, function_exclude=None, trace_arguments=False):
-    # Argument tracing requires access to frame locals, which is only available
-    # in the setprofile-based tracer. Prefer it when trace_arguments is enabled.
-    if trace_arguments:
-        return PyftraceSetprofile(verbose, show_path, report_mode, output_stream, function_filter, function_exclude, trace_arguments)
     if sys.version_info >= (3, 12):
         return PyftraceMonitoring(verbose, show_path, report_mode, output_stream, function_filter, function_exclude, trace_arguments)
     else:

@@ -5,6 +5,7 @@ import weakref
 import sysconfig
 from ..tracer import PyftraceBase
 from ..utils import resolve_filename, get_line_number, callable_name
+from ..utils import format_arguments
 
 class PyftraceMonitoring(PyftraceBase):
     """
@@ -96,9 +97,13 @@ class PyftraceMonitoring(PyftraceBase):
             trace_this = self.should_trace(def_filename) or self.verbose
         trace_this = trace_this and self.file_selected(def_filename)
 
+        arguments = ""
+        if self.trace_arguments and trace_this:
+            arguments = format_arguments(frame)
+
         def_location = f"{def_filename}:{code.co_firstlineno}"
         self.trace_call(func_name, False, trace_this, def_location,
-                        call_filename, call_lineno)
+                        call_filename, call_lineno, arguments)
 
     def handle_call_event(self, code, instruction_offset, callable_obj):
         if not self.tracing_started:
@@ -144,7 +149,7 @@ class PyftraceMonitoring(PyftraceBase):
                         call_filename, call_lineno)
 
     def trace_call(self, func_name, is_builtin, trace_this, def_location,
-                   call_filename, call_lineno):
+                   call_filename, call_lineno, arguments=""):
         if self.function_exclude and func_name in self.function_exclude:
             self.exclude_depth += 1
         if self.exclude_depth > 0:
@@ -158,7 +163,8 @@ class PyftraceMonitoring(PyftraceBase):
 
         if trace_this and not self.is_tracer_code(call_filename):
             self.call_stack.append((func_name, is_builtin))
-            self.emit_call(func_name, def_location, call_filename, call_lineno)
+            self.emit_call(func_name, def_location, call_filename, call_lineno,
+                           arguments)
 
             if self.report_mode:
                 start_time = time.time()
