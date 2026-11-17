@@ -8,6 +8,8 @@ def format_text(event):
     """
     kind = event["event"]
     indent = INDENT * event.get("depth", 0)
+    if "tid" in event:
+        indent = f"[tid {event['tid']}] {indent}"
 
     if kind == "call":
         function = event["function"]
@@ -169,6 +171,9 @@ class Collapser:
         if frame.count == 0:
             return
         event = {"event": "repeat", "depth": level + 1, "count": frame.count}
+        # Carry over what identifies the thread
+        first = frame.previous[0]
+        event.update((key, first[key]) for key in ("tid",) if key in first)
         frame.count = 0
         self.write(level, event)
 

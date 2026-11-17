@@ -3,6 +3,7 @@ import os
 import runpy
 import site
 import sysconfig
+import threading
 from abc import ABC, abstractmethod
 from .utils import find_import_end_line, find_module_file
 from .utils import format_exception, safe_str
@@ -11,6 +12,21 @@ from .output import Collapser, format_text
 
 # Marks a function exit that has no value to show
 NO_VALUE = object()
+
+class ThreadState:
+    """
+    What the tracer has to know about each thread on its own.
+    """
+    __slots__ = ("call_stack", "filter_depth", "exclude_depth", "collapser",
+                 "tid")
+
+    def __init__(self):
+        self.call_stack = []
+        self.filter_depth = 0
+        self.exclude_depth = 0
+        self.collapser = None
+        # Shown with every event of the thread; None for the main thread
+        self.tid = None
 
 class PyftraceBase(ABC):
     """
@@ -21,7 +37,10 @@ class PyftraceBase(ABC):
         self.script_dir = None
         self.report_mode = report_mode
         self.execution_report = {}
-        self.call_stack = []
+        self.thread_states = threading.local()
+        self.main_thread = threading.get_ident()
+        self.output_lock = threading.Lock()
+        self.collapsers = []
         self.tracer_script = os.path.abspath(__file__)
         self.tracer_dir = os.path.dirname(self.tracer_script)
         self.tracing_started = False
@@ -35,7 +54,6 @@ class PyftraceBase(ABC):
         self.format = format_text
         # Fold repeated calls, see Collapser
         self.collapse = False
-        self.collapser = None
         self.emitted_lines = 0
         self.trace_arguments = trace_arguments
 
@@ -47,13 +65,48 @@ class PyftraceBase(ABC):
 
         # Sets of function names given with -f and -e
         self.function_filter = frozenset(function_filter or ())
-        self.filter_depth = 0
         self.function_exclude = frozenset(function_exclude or ())
-        self.exclude_depth = 0
 
         # Normalized paths given with -F and -E
         self.file_filter = ()
         self.file_exclude = ()
+
+    @property
+    def thread_state(self):
+        try:
+            return self.thread_states.state
+        except AttributeError:
+            pass
+        state = self.thread_states.state = ThreadState()
+        if threading.get_ident() != self.main_thread:
+            state.tid = threading.get_native_id()
+        if self.collapse:
+            state.collapser = Collapser(self.write_event)
+            with self.output_lock:
+                self.collapsers.append(state.collapser)
+        return state
+
+    # The engines keep their bookkeeping in these.  Each thread has its
+    # own call stack, so each thread gets its own copy.
+    @property
+    def call_stack(self):
+        return self.thread_state.call_stack
+
+    @property
+    def filter_depth(self):
+        return self.thread_state.filter_depth
+
+    @filter_depth.setter
+    def filter_depth(self, depth):
+        self.thread_state.filter_depth = depth
+
+    @property
+    def exclude_depth(self):
+        return self.thread_state.exclude_depth
+
+    @exclude_depth.setter
+    def exclude_depth(self, depth):
+        self.thread_state.exclude_depth = depth
 
     @abstractmethod
     def setup_tracing(self):
@@ -78,8 +131,9 @@ class PyftraceBase(ABC):
         old_sys_argv = sys.argv.copy()
         sys.argv = argv
 
-        if self.collapse:
-            self.collapser = Collapser(self.write_event)
+        # The thread running the target is the one shown without a tid
+        self.main_thread = threading.get_ident()
+        self.thread_states = threading.local()
 
         self.tracing_started = False
         self.setup_tracing()
@@ -88,8 +142,8 @@ class PyftraceBase(ABC):
             run()
         finally:
             self.tracing_started = False
-            if self.collapser:
-                self.collapser.finish()
+            for collapser in self.collapsers:
+                collapser.finish()
             self.cleanup_tracing()
             sys.path = old_sys_path
             sys.argv = old_sys_argv
@@ -189,18 +243,23 @@ class PyftraceBase(ABC):
         self.emit(event)
 
     def emit(self, event):
-        if self.collapser:
-            self.collapser.feed(event)
+        state = self.thread_state
+        if state.tid is not None:
+            event["tid"] = state.tid
+        if state.collapser:
+            state.collapser.feed(event)
         else:
             self.write_event(event)
 
     def write_event(self, event):
-        if self.is_truncated():
-            return
-        self.emitted_lines += 1
-        if self.is_truncated():
-            event = {"event": "truncated", "max_lines": self.max_lines}
-        print(self.format(event), file=self.output_stream)
+        # Threads share the line count and must not mix their lines
+        with self.output_lock:
+            if self.is_truncated():
+                return
+            self.emitted_lines += 1
+            if self.is_truncated():
+                event = {"event": "truncated", "max_lines": self.max_lines}
+            self.output_stream.write(self.format(event) + "\n")
 
     def should_trace(self, file_name):
         if not file_name:
