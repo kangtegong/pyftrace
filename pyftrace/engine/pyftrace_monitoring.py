@@ -4,7 +4,7 @@ import time
 import weakref
 import sysconfig
 from ..tracer import PyftraceBase
-from ..utils import resolve_filename, get_line_number
+from ..utils import resolve_filename, get_line_number, callable_name
 
 class PyftraceMonitoring(PyftraceBase):
     """
@@ -61,7 +61,7 @@ class PyftraceMonitoring(PyftraceBase):
         if isinstance(callable_obj, weakref.ReferenceType):
             callable_obj = callable_obj()
 
-        func_name = getattr(callable_obj, '__name__', str(callable_obj))
+        func_name = callable_name(callable_obj)
         module_name = getattr(callable_obj, '__module__', None)
         is_builtin = module_name in (None, 'builtins')
 
@@ -187,7 +187,7 @@ class PyftraceMonitoring(PyftraceBase):
         if not self.tracing_started:
             return
 
-        func_name = getattr(callable_obj, '__name__', str(callable_obj))
+        func_name = callable_name(callable_obj)
         module_name = getattr(callable_obj, '__module__', None)
         is_builtin = module_name in (None, 'builtins')
         filename = resolve_filename(code, callable_obj)

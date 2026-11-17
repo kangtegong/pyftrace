@@ -3,7 +3,7 @@ import os
 import time
 import sysconfig
 from ..tracer import PyftraceBase
-from ..utils import resolve_filename, format_arguments
+from ..utils import resolve_filename, format_arguments, callable_name
 
 class PyftraceSetprofile(PyftraceBase):
     """
@@ -35,8 +35,7 @@ class PyftraceSetprofile(PyftraceBase):
 
     def handle_call_event(self, frame, arg, is_c_call=False):
         if is_c_call:
-            # Get the '__name__' attribute of 'arg', or use str(arg) if '__name__' is not present
-            func_name = getattr(arg, '__name__', str(arg))
+            func_name = callable_name(arg)
             # Retrieve the '__module__' attribute of 'arg', or use '' if it's not available
             module_name = getattr(arg, '__module__', '') or ''
             code = None
@@ -166,7 +165,7 @@ class PyftraceSetprofile(PyftraceBase):
             return
 
         if is_c_return:
-            func_name = getattr(arg, '__name__', str(arg))
+            func_name = callable_name(arg)
             module_name = getattr(arg, '__module__', '') or ''
             code = None
             filename = None

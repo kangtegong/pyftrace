@@ -22,6 +22,16 @@ def resolve_filename(code, callable_obj):
                 filename = module.__file__
     return filename
 
+def callable_name(callable_obj):
+    """
+    Name a traced callable without calling into user code: str() and
+    repr() may be overridden and can raise or have side effects.
+    """
+    name = getattr(callable_obj, '__name__', None)
+    if isinstance(name, str):
+        return name
+    return type(callable_obj).__name__
+
 def get_line_number(code, instruction_offset):
     if code is None:
         return 0
