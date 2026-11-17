@@ -210,6 +210,12 @@ class PyftraceSetprofile(PyftraceBase):
                         if self.call_stack and self.call_stack[-1] == func_name:
                             trace_this = True
 
+        if self.function_filter:
+            if self.filter_depth == 0:
+                return
+            if func_name == self.function_filter and trace_this:
+                self.filter_depth -= 1
+
         if trace_this and self.call_stack and self.call_stack[-1] == func_name:
             indent = "    " * self.current_depth()
 

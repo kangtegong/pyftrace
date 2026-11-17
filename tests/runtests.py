@@ -297,6 +297,26 @@ The sum of 3.0 and 5.0 is 8.0"""
         self.assertEqual(normalized_expected, normalized_actual)
         self.assertEqual(result.returncode, 0)
 
+    def test_function_filter(self):
+        """
+        Test '--function' flag for tracing a single function.
+        """
+        args = ['--function', 'function_a', self.main_script]
+        result = self.run_pyftrace(args)
+
+        expected_output = f"""Running script: {self.main_script}
+    Called function_a from line 5
+Function A is called.
+    Returning function_a-> ret_a
+Function B is called.
+Results: ret_a, ret_b"""
+
+        normalized_expected = self.normalize_output(expected_output)
+        normalized_actual = self.normalize_output(result.stdout)
+
+        self.assertEqual(normalized_expected, normalized_actual)
+        self.assertEqual(result.returncode, 0)
+
     # def test_tracing_script_path(self):
     #     """
     #     Test '--path' flag to include file paths in tracing.
