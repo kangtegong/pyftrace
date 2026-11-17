@@ -98,21 +98,16 @@ class PyftraceMonitoring(PyftraceBase):
                 if self.verbose and self.should_trace(def_filename):
                     trace_this = True
 
-        if self.exclude_depth > 0:
-            return
         if self.function_exclude and func_name == self.function_exclude:
             self.exclude_depth += 1
+        if self.exclude_depth > 0:
             return
 
         if self.function_filter:
-            if self.filter_depth == 0:
-                if func_name == self.function_filter and trace_this:
-                    self.filter_depth += 1
-                else:
-                    return
-            else:
-                if not trace_this:
-                    return
+            if func_name == self.function_filter and trace_this:
+                self.filter_depth += 1
+            if self.filter_depth == 0 or not trace_this:
+                return
 
         if trace_this and not self.is_tracer_code(call_filename):
             self.call_stack.append((func_name, is_builtin))
@@ -161,11 +156,10 @@ class PyftraceMonitoring(PyftraceBase):
         trace_this = self.should_trace(filename) or self.verbose
 
         if self.function_filter:
-            if self.filter_depth > 0:
-                if func_name == self.function_filter:
-                    self.filter_depth -= 1
-            else:
+            if self.filter_depth == 0:
                 return
+            if func_name == self.function_filter and trace_this:
+                self.filter_depth -= 1
 
         if trace_this and not self.is_tracer_code(filename):
             if self.call_stack and self.call_stack[-1][0] == func_name:

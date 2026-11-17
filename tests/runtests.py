@@ -22,6 +22,7 @@ class PyftraceTests(unittest.TestCase):
         cls.module_a = os.path.join(cls.project_root, 'examples', 'module_trace', 'module_a.py')
         cls.module_b = os.path.join(cls.project_root, 'examples', 'module_trace', 'module_b.py')
         cls.exception_script = os.path.join(cls.project_root, 'examples', 'exception.py')
+        cls.recursive_script = os.path.join(cls.project_root, 'examples', 'recursives.py')
         cls.add_script = os.path.join(cls.project_root, 'examples', 'add.py')
         cls.temp_output = os.path.join(cls.project_root, 'tests', 'tmp_output.txt')
 
@@ -315,6 +316,17 @@ Results: ret_a, ret_b"""
         normalized_actual = self.normalize_output(result.stdout)
 
         self.assertEqual(normalized_expected, normalized_actual)
+        self.assertEqual(result.returncode, 0)
+
+    def test_function_filter_recursive(self):
+        """
+        Test that '--function' stays open until the outermost call returns.
+        """
+        args = ['--function', 'countdown', self.recursive_script]
+        result = self.run_pyftrace(args)
+
+        self.assertEqual(result.stdout.count("Called countdown"), 51)
+        self.assertEqual(result.stdout.count("Returning countdown"), 51)
         self.assertEqual(result.returncode, 0)
 
     # def test_tracing_script_path(self):

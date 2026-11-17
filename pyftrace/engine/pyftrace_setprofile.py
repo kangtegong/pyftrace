@@ -97,21 +97,16 @@ class PyftraceSetprofile(PyftraceBase):
                 elif self.verbose and module_name == 'builtins':
                     trace_this = True
 
-        if self.exclude_depth > 0:
-            return
         if self.function_exclude and func_name == self.function_exclude:
             self.exclude_depth += 1
+        if self.exclude_depth > 0:
             return
 
         if self.function_filter:
-            if self.filter_depth == 0:
-                if func_name == self.function_filter and trace_this:
-                    self.filter_depth += 1
-                else:
-                    return
-            else:
-                if not trace_this:
-                    return
+            if func_name == self.function_filter and trace_this:
+                self.filter_depth += 1
+            if self.filter_depth == 0 or not trace_this:
+                return
 
         if trace_this:
             self.call_stack.append(func_name)
