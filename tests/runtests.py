@@ -27,6 +27,7 @@ class PyftraceTests(unittest.TestCase):
         cls.loop_script = os.path.join(cls.project_root, 'examples', 'loop.py')
         cls.threads_script = os.path.join(cls.project_root, 'examples', 'threads.py')
         cls.processes_script = os.path.join(cls.project_root, 'examples', 'processes.py')
+        cls.callback_script = os.path.join(cls.project_root, 'examples', 'callback.py')
         cls.add_script = os.path.join(cls.project_root, 'examples', 'add.py')
         cls.temp_output = os.path.join(cls.project_root, 'tests', 'tmp_output.txt')
 
@@ -522,6 +523,26 @@ Results: ret_a, ret_b
         Test that a child process writes its trace to the '--output' file.
         """
         self.check_processes(['--output', self.temp_output])
+
+    def test_callback(self):
+        """
+        Test that a function called from C code, here map(), is traced.
+        """
+        result = self.run_pyftrace([self.callback_script])
+
+        expected_output = f"""Running script: {self.callback_script}
+    Called total from line 7
+        Called square from line 5
+        Returning square-> 1
+        Called square from line 5
+        Returning square-> 4
+    Returning total-> 5"""
+
+        normalized_expected = self.normalize_output(expected_output)
+        normalized_actual = self.normalize_output(result.stdout)
+
+        self.assertEqual(normalized_expected, normalized_actual)
+        self.assertEqual(result.returncode, 0)
 
     # def test_tracing_script_path(self):
     #     """
