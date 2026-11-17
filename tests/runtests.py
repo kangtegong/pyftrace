@@ -1022,6 +1022,232 @@ class OptionTests(PyftraceTestCase):
         self.assertIn("cannot be combined with -m", result.stderr)
         self.assertEqual(result.returncode, 2)
 
+class RegressionTests(PyftraceTestCase):
+    """
+    Programs that used to be traced wrongly, or broken by being traced.
+    """
+
+    def test_library_code_not_traced(self):
+        """
+        Test that standard library and generated code is left out.
+        """
+        result = self.run_source("""
+            import json
+            import os
+            from collections import namedtuple
+
+            Point = namedtuple("Point", "x y")
+
+            def name_of(path):
+                json.dumps({"path": path})
+                Point(1, 2)
+                return os.path.basename(path)
+
+            name_of("a/b.txt")
+        """)
+
+        self.assertEqual([
+            "    Called name_of from line 13",
+            "    Returning name_of-> b.txt",
+        ], self.trace_lines(result.stdout))
+
+    def test_class_body_not_traced(self):
+        """
+        Test that defining a class is not shown as a call.
+        """
+        result = self.run_source("""
+            class Greeter:
+                greeting = "hi"
+
+                def hello(self):
+                    return self.greeting
+
+            Greeter().hello()
+        """)
+
+        self.assertEqual([
+            "    Called hello from line 8",
+            "    Returning hello-> hi",
+        ], self.trace_lines(result.stdout))
+
+    def test_repr_of_callable_not_called(self):
+        """
+        Test that naming a callable does not run its __repr__.
+        """
+        result = self.run_source("""
+            class Greeter:
+                def __repr__(self):
+                    raise RuntimeError("repr must not be called")
+
+                def __call__(self):
+                    return "hi"
+
+            Greeter()()
+            print("still alive")
+        """)
+
+        self.assertIn("still alive", result.stdout)
+        self.assertEqual(result.returncode, 0)
+
+    def test_unprintable_return_value(self):
+        """
+        Test that a return value whose __str__ raises does no harm.
+        """
+        result = self.run_source("""
+            class Broken:
+                def __str__(self):
+                    raise RuntimeError("no str for you")
+
+            def make():
+                return Broken()
+
+            make()
+            print("still alive")
+        """)
+
+        self.assertEqual([
+            "    Called make from line 9",
+            "    Returning make-> <unprintable Broken>",
+        ], self.trace_lines(result.stdout))
+        self.assertIn("still alive", result.stdout)
+        self.assertEqual(result.returncode, 0)
+
+    def test_long_value_on_one_line(self):
+        """
+        Test that a long or multi-line value is cut down to one line.
+        """
+        result = self.run_source("""
+            def table():
+                return "row 1\\nrow 2\\nrow 3"
+
+            def big():
+                return list(range(500))
+
+            table()
+            big()
+        """)
+        lines = self.trace_lines(result.stdout)
+
+        self.assertEqual(4, len(lines))
+        self.assertEqual("    Returning table-> row 1 row 2 row 3", lines[1])
+        self.assertTrue(lines[3].endswith("..."))
+        self.assertLess(len(lines[3]), 250)
+
+    def test_decorated_function(self):
+        """
+        Test that a function wrapped with functools.wraps returns properly.
+        """
+        result = self.run_source("""
+            import functools
+
+            def logged(func):
+                @functools.wraps(func)
+                def wrapper(*args):
+                    return func(*args)
+                return wrapper
+
+            @logged
+            def add(a, b):
+                return a + b
+
+            def after():
+                return 1
+
+            add(1, 2)
+            after()
+        """)
+        lines = self.trace_lines(result.stdout)
+
+        # The decorator itself is called from line 10 or 11, depending on
+        # the Python version
+        self.assertEqual([
+            "    Called wrapper from line 17",
+            "        Called add from line 7",
+            "        Returning add-> 3",
+            "    Returning wrapper-> 3",
+            "    Called after from line 18",
+            "    Returning after-> 1",
+        ], lines[2:])
+
+    def test_coroutine(self):
+        """
+        Test that a suspended coroutine is not taken for one that raised.
+        """
+        result = self.run_source("""
+            import asyncio
+
+            async def fetch():
+                await asyncio.sleep(0)
+                return "data"
+
+            async def broken():
+                await asyncio.sleep(0)
+                raise ValueError("v")
+
+            asyncio.run(fetch())
+            try:
+                asyncio.run(broken())
+            except ValueError:
+                pass
+        """)
+        lines = [re.sub(r" from line \d+", "", line).strip()
+                 for line in self.trace_lines(result.stdout)]
+
+        self.assertEqual([
+            "Called fetch", "Returning fetch-> None",
+            "Called fetch", "Returning fetch-> data",
+            "Called broken", "Returning broken-> None",
+            "Called broken", "Raised broken",
+        ], lines)
+
+    def test_exception_detail(self):
+        """
+        Test that the sys.monitoring engine names the exception.
+        """
+        if sys.version_info < (3, 12):
+            self.skipTest("sys.setprofile does not report the exception")
+        result = self.run_pyftrace(['--argument', self.exception_script])
+
+        self.assertIn("Raised parse-> ValueError: invalid literal for int() "
+                      "with base 10: 'x'", result.stdout)
+        self.assertIn("Called parse (text='x') from line 5", result.stdout)
+
+    def test_script_is_main_module(self):
+        """
+        Test that the script runs as __main__, so that it can be pickled.
+        """
+        result = self.run_source("""
+            import pickle
+            import sys
+
+            def work():
+                return 1
+
+            assert sys.modules["__main__"].work is work
+            assert pickle.loads(pickle.dumps(work)) is work
+            print("pickled")
+        """)
+
+        self.assertIn("pickled", result.stdout)
+        self.assertEqual(result.returncode, 0)
+
+    def test_hard_exit_keeps_trace(self):
+        """
+        Test that the trace survives a program that ends with os._exit().
+        """
+        result = self.run_source("""
+            import os
+
+            def crash():
+                os._exit(7)
+
+            crash()
+        """)
+
+        self.assertEqual(["    Called crash from line 7"],
+                         self.trace_lines(result.stdout))
+        self.assertEqual(result.returncode, 7)
+
 def has_module(name):
     return importlib.util.find_spec(name) is not None
 
