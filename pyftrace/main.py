@@ -1,6 +1,5 @@
 import sys
 import argparse
-import contextlib
 from .tracer import get_tracer
 from .utils import find_module_file
 from .tui import run_tui
@@ -45,7 +44,7 @@ def main():
     parser.add_argument('-f', '--function', help="Trace only calls of <function> and its subcalls")
     parser.add_argument('-e', '--exclude-function', help="Exclude calls of <function> (and its subcalls) from tracing")
     parser.add_argument('-a', '--argument', action='store_true', help="Show function arguments in tracing output (Python frames only)")
-    parser.add_argument('-o', '--output', help="Write tracing output to a file")
+    parser.add_argument('-o', '--output', help="Write tracing output to a file. The traced program's own output is not redirected")
 
     parser.add_argument('-m', dest='module', metavar='MODULE', help="Run and trace a library module as a script, like 'python -m'.\nEverything after MODULE is passed to the module.")
 
@@ -120,12 +119,11 @@ def main():
                 trace_arguments=args.argument
             )
             tracer.max_depth = tracer_depth
-            with contextlib.redirect_stdout(output_stream):
-                run_target(tracer, module, script_path, target_args)
+            run_target(tracer, module, script_path, target_args)
 
-                if args.report:
-                    tracer.print_report(stream=output_stream)
-                    sys.exit(0)
+            if args.report:
+                tracer.print_report(stream=output_stream)
+                sys.exit(0)
     finally:
         if output_file_handle:
             output_file_handle.close()

@@ -76,7 +76,7 @@ $ pip install pyftrace
 - `--report` or `-r`: Generate a report of function execution times and call counts at the end of the script's execution.
 - `--verbose` or `-v`: Enable tracing of built-in functions (e.g., print, len). Without this flag, pyftrace only traces user-defined functions.
 - `--argument` or `-a`: Show function arguments for Python functions.
-- `--output` or `-o <filename>`: Write tracing output to a file instead of stdout.
+- `--output` or `-o <filename>`: Write tracing output to a file instead of stdout. The traced program's own output still goes to stdout.
 - `-m <module> [args ...]`: Run and trace a module as `python -m` does, e.g. `pyftrace -m pytest tests/`. Everything after the module name is passed to the module, so pyftrace's own options must come before `-m`.
 - `--path` or `-p`: Include file paths in the tracing output. 
 - `--help` or `-h`: Display help information about pyftrace and its options.
