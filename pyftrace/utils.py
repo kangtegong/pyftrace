@@ -42,15 +42,21 @@ def callable_name(callable_obj):
         return name
     return type(callable_obj).__name__
 
+def safe_str(value):
+    """
+    str() that cannot fail: __str__ of a traced object is user code.
+    """
+    try:
+        return str(value)
+    except Exception:
+        return f"<unprintable {type(value).__name__}>"
+
 def format_exception(exception):
     """
     Describe an exception like the last line of a traceback does.
     """
     name = type(exception).__name__
-    try:
-        message = str(exception)
-    except Exception:
-        return name
+    message = safe_str(exception)
     return f"{name}: {message}" if message else name
 
 def is_unwinding(frame, retval):

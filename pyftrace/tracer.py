@@ -4,7 +4,8 @@ import runpy
 import site
 import sysconfig
 from abc import ABC, abstractmethod
-from .utils import find_import_end_line, find_module_file, format_exception
+from .utils import find_import_end_line, find_module_file
+from .utils import format_exception, safe_str
 
 # Marks a function exit that has no value to show
 NO_VALUE = object()
@@ -161,7 +162,7 @@ class PyftraceBase(ABC):
         elif value is NO_VALUE:
             text = f"Returning {func_name}"
         else:
-            text = f"Returning {func_name}-> {value}"
+            text = f"Returning {func_name}-> {safe_str(value)}"
         if self.show_path and file_name:
             text = f"{text} @ {file_name}"
 
