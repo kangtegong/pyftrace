@@ -141,7 +141,10 @@ class PyftraceBase(ABC):
         self.setup_tracing()
 
         try:
-            run()
+            try:
+                run()
+            finally:
+                self.wait_for_threads()
         finally:
             self.tracing_started = False
             for collapser in self.collapsers:
@@ -149,6 +152,22 @@ class PyftraceBase(ABC):
             self.cleanup_tracing()
             sys.path = old_sys_path
             sys.argv = old_sys_argv
+
+    @staticmethod
+    def wait_for_threads():
+        """
+        Wait for the threads the interpreter would wait for at exit.
+        They are part of the program and tracing must not end before
+        they do.
+        """
+        current = threading.current_thread()
+        while True:
+            threads = [thread for thread in threading.enumerate()
+                       if thread is not current and not thread.daemon]
+            if not threads:
+                return
+            for thread in threads:
+                thread.join()
 
     def run_python_script(self, script_path, script_args):
         self.emit_start({"event": "start", "script": script_path})
