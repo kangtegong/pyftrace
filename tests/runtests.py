@@ -28,6 +28,7 @@ class PyftraceTests(unittest.TestCase):
         cls.threads_script = os.path.join(cls.project_root, 'examples', 'threads.py')
         cls.processes_script = os.path.join(cls.project_root, 'examples', 'processes.py')
         cls.callback_script = os.path.join(cls.project_root, 'examples', 'callback.py')
+        cls.generator_script = os.path.join(cls.project_root, 'examples', 'generator.py')
         cls.add_script = os.path.join(cls.project_root, 'examples', 'add.py')
         cls.temp_output = os.path.join(cls.project_root, 'tests', 'tmp_output.txt')
 
@@ -542,6 +543,30 @@ Results: ret_a, ret_b
         normalized_actual = self.normalize_output(result.stdout)
 
         self.assertEqual(normalized_expected, normalized_actual)
+        self.assertEqual(result.returncode, 0)
+
+    def test_generator(self):
+        """
+        Test that a suspended generator is not on the call stack.
+        """
+        result = self.run_pyftrace([self.generator_script])
+
+        expected_output = f"""Running script: {self.generator_script}
+    Called numbers from line 8
+    Returning numbers-> 1
+    Called show from line 9
+    Returning show-> 1
+    Called numbers from line 8
+    Returning numbers-> 2
+    Called show from line 9
+    Returning show-> 2
+    Called numbers from line 8
+    Returning numbers-> None"""
+
+        self.assertEqual(self.normalize_output(expected_output),
+                         self.normalize_output(result.stdout))
+        # No call may be nested under the generator
+        self.assertNotIn("        Called", result.stdout)
         self.assertEqual(result.returncode, 0)
 
     # def test_tracing_script_path(self):

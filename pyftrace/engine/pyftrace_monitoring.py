@@ -18,6 +18,8 @@ class PyftraceMonitoring(PyftraceBase):
         self.tool_id = 1
         sys.monitoring.use_tool_id(self.tool_id, "pyftrace")
         sys.monitoring.register_callback(self.tool_id, sys.monitoring.events.PY_START, self.monitor_py_start)
+        sys.monitoring.register_callback(self.tool_id, sys.monitoring.events.PY_RESUME, self.monitor_py_start)
+        sys.monitoring.register_callback(self.tool_id, sys.monitoring.events.PY_YIELD, self.monitor_py_return)
         sys.monitoring.register_callback(self.tool_id, sys.monitoring.events.CALL, self.monitor_call)
         sys.monitoring.register_callback(self.tool_id, sys.monitoring.events.PY_RETURN, self.monitor_py_return)
         sys.monitoring.register_callback(self.tool_id, sys.monitoring.events.C_RETURN, self.monitor_c_return)
@@ -26,6 +28,8 @@ class PyftraceMonitoring(PyftraceBase):
         sys.monitoring.set_events(
             self.tool_id,
             sys.monitoring.events.PY_START |
+            sys.monitoring.events.PY_RESUME |
+            sys.monitoring.events.PY_YIELD |
             sys.monitoring.events.CALL |
             sys.monitoring.events.PY_RETURN |
             sys.monitoring.events.PY_UNWIND |
@@ -36,6 +40,10 @@ class PyftraceMonitoring(PyftraceBase):
     def cleanup_tracing(self):
         sys.monitoring.free_tool_id(self.tool_id)
         self.output_stream = None
+
+    # A generator or coroutine leaves the call stack while it is
+    # suspended: PY_YIELD is handled like a return and PY_RESUME like a
+    # call, as a profile function sees them.
 
     def monitor_py_start(self, code, instruction_offset):
         # The callback is called from the frame of the function
