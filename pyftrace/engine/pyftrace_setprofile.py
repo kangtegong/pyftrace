@@ -110,12 +110,10 @@ class PyftraceSetprofile(PyftraceBase):
 
         if trace_this:
             self.call_stack.append(func_name)
-            indent = "    " * self.current_depth()
 
-            if not is_c_call and code:
-                func_def_lineno = code.co_firstlineno
-            else:
-                func_def_lineno = ''
+            def_location = filename
+            if filename and not is_c_call and code:
+                def_location = f"{filename}:{code.co_firstlineno}"
 
             if caller_frame:
                 call_lineno = caller_frame.f_lineno
@@ -126,27 +124,12 @@ class PyftraceSetprofile(PyftraceBase):
                 call_lineno = ''
                 call_filename = ''
 
-            if self.show_path:
-                if func_def_lineno:
-                    func_location = f"{func_name}@{filename}:{func_def_lineno}" if filename else func_name
-                else:
-                    func_location = f"{func_name}@{filename}" if filename else func_name
-                if call_filename and call_lineno:
-                    call_location = f"from {call_filename}:{call_lineno}"
-                else:
-                    call_location = f"from line {call_lineno}"
-            else:
-                func_location = func_name
-                call_location = f"from line {call_lineno}"
-
-            arg_suffix = ""
+            arguments = ""
             if self.trace_arguments and not is_c_call and code:
-                arg_display = format_arguments(frame)
-                if arg_display:
-                    arg_suffix = f" ({arg_display})"
+                arguments = format_arguments(frame)
 
-            if self.should_emit():
-                self.emit(f"{indent}Called {func_location}{arg_suffix} {call_location}")
+            self.emit_call(func_name, def_location, call_filename, call_lineno,
+                           arguments)
 
             if self.report_mode:
                 start_time = time.time()
@@ -212,21 +195,13 @@ class PyftraceSetprofile(PyftraceBase):
                 self.filter_depth -= 1
 
         if trace_this and self.call_stack and self.call_stack[-1] == func_name:
-            indent = "    " * self.current_depth()
-
-            if self.show_path:
-                file_info = f" @ {filename}" if filename else ""
-            else:
-                file_info = ""
-
-            if self.should_emit() and raised:
+            if raised:
                 # The exception itself is not passed to a profile function
-                self.emit(f"{indent}Raised {func_name}{file_info}")
-            elif self.should_emit():
-                return_value = ''
-                if not is_c_return:
-                    return_value = f"-> {arg}"
-                self.emit(f"{indent}Returning {func_name}{return_value}{file_info}")
+                self.emit_exit(func_name, filename, raised=True)
+            elif is_c_return:
+                self.emit_exit(func_name, filename)
+            else:
+                self.emit_exit(func_name, filename, value=arg)
 
             if self.report_mode and func_name in self.execution_report:
                 start_time, total_time, call_count = self.execution_report[func_name]

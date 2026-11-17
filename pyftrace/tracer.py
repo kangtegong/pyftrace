@@ -4,7 +4,10 @@ import runpy
 import site
 import sysconfig
 from abc import ABC, abstractmethod
-from .utils import find_import_end_line, find_module_file
+from .utils import find_import_end_line, find_module_file, format_exception
+
+# Marks a function exit that has no value to show
+NO_VALUE = object()
 
 class PyftraceBase(ABC):
     """
@@ -127,6 +130,42 @@ class PyftraceBase(ABC):
 
     def is_truncated(self):
         return self.max_lines is not None and self.emitted_lines > self.max_lines
+
+    def emit_call(self, func_name, def_location, call_file, call_line,
+                  arguments=""):
+        if not self.should_emit():
+            return
+
+        indent = "    " * self.current_depth()
+        function = func_name
+        caller = f"from line {call_line}"
+        if self.show_path and def_location:
+            function = f"{func_name}@{def_location}"
+        if self.show_path and call_file and call_line:
+            caller = f"from {call_file}:{call_line}"
+        if arguments:
+            function = f"{function} ({arguments})"
+
+        self.emit(f"{indent}Called {function} {caller}")
+
+    def emit_exit(self, func_name, file_name, value=NO_VALUE, exception=None,
+                  raised=False):
+        if not self.should_emit():
+            return
+
+        indent = "    " * self.current_depth()
+        if exception is not None:
+            text = f"Raised {func_name}-> {format_exception(exception)}"
+        elif raised:
+            text = f"Raised {func_name}"
+        elif value is NO_VALUE:
+            text = f"Returning {func_name}"
+        else:
+            text = f"Returning {func_name}-> {value}"
+        if self.show_path and file_name:
+            text = f"{text} @ {file_name}"
+
+        self.emit(f"{indent}{text}")
 
     def emit(self, line):
         self.emitted_lines += 1

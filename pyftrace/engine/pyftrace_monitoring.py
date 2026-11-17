@@ -5,7 +5,6 @@ import weakref
 import sysconfig
 from ..tracer import PyftraceBase
 from ..utils import resolve_filename, get_line_number, callable_name
-from ..utils import format_exception
 
 class PyftraceMonitoring(PyftraceBase):
     """
@@ -111,21 +110,13 @@ class PyftraceMonitoring(PyftraceBase):
 
         if trace_this and not self.is_tracer_code(call_filename):
             self.call_stack.append((func_name, is_builtin))
-            indent = "    " * self.current_depth()
 
-            if self.show_path:
-                if is_builtin or not def_filename:
-                    func_location = f"{func_name}@{module_name or '<builtin>'}"
-                else:
-                    func_location = f"{func_name}@{def_filename}:{func_def_lineno}"
-                call_location = f"from {call_filename}:{call_lineno}"
+            if is_builtin or not def_filename:
+                def_location = module_name or '<builtin>'
             else:
-                func_location = func_name
-                call_location = f"from line {call_lineno}"
+                def_location = f"{def_filename}:{func_def_lineno}"
 
-            # Check depth limit
-            if self.should_emit():
-                self.emit(f"{indent}Called {func_location} {call_location}")
+            self.emit_call(func_name, def_location, call_filename, call_lineno)
 
             if self.report_mode:
                 start_time = time.time()
@@ -163,25 +154,13 @@ class PyftraceMonitoring(PyftraceBase):
 
         if trace_this and not self.is_tracer_code(filename):
             if self.call_stack and self.call_stack[-1][0] == func_name:
-                indent = "    " * self.current_depth()
-                stack_func_name, _ = self.call_stack[-1]
+                self.emit_exit(func_name, filename, value=retval,
+                               exception=exception)
 
-                if self.show_path:
-                    file_info = f" @ {filename}" if filename else ""
-                else:
-                    file_info = ""
-
-                if stack_func_name == func_name:
-                    if self.should_emit() and exception is not None:
-                        detail = format_exception(exception)
-                        self.emit(f"{indent}Raised {func_name}-> {detail}{file_info}")
-                    elif self.should_emit():
-                        self.emit(f"{indent}Returning {func_name}-> {retval}{file_info}")
-
-                    if self.report_mode and func_name in self.execution_report:
-                        start_time, total_time, call_count = self.execution_report[func_name]
-                        exec_time = time.time() - start_time
-                        self.execution_report[func_name] = (start_time, total_time + exec_time, call_count)
+                if self.report_mode and func_name in self.execution_report:
+                    start_time, total_time, call_count = self.execution_report[func_name]
+                    exec_time = time.time() - start_time
+                    self.execution_report[func_name] = (start_time, total_time + exec_time, call_count)
 
                 self.call_stack.pop()
 
@@ -219,23 +198,12 @@ class PyftraceMonitoring(PyftraceBase):
 
         if not self.is_tracer_code(filename) and trace_this:
             if self.call_stack and self.call_stack[-1][0] == func_name:
-                indent = "    " * self.current_depth()
+                self.emit_exit(func_name, filename, raised=raised)
 
-                stack_func_name, _ = self.call_stack[-1]
-
-                if self.show_path:
-                    file_info = f" @ {filename}" if filename else ""
-                else:
-                    file_info = ""
-
-                if stack_func_name == func_name:
-                    if self.should_emit():
-                        verb = "Raised" if raised else "Returning"
-                        self.emit(f"{indent}{verb} {func_name}{file_info}")
-                    if self.report_mode and func_name in self.execution_report:
-                        start_time, total_time, call_count = self.execution_report[func_name]
-                        exec_time = time.time() - start_time
-                        self.execution_report[func_name] = (start_time, total_time + exec_time, call_count)
+                if self.report_mode and func_name in self.execution_report:
+                    start_time, total_time, call_count = self.execution_report[func_name]
+                    exec_time = time.time() - start_time
+                    self.execution_report[func_name] = (start_time, total_time + exec_time, call_count)
 
                 self.call_stack.pop()
 
