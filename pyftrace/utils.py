@@ -8,8 +8,7 @@ import importlib.util
 # A frame that returns or yields normally stops at one of these
 EXIT_OPCODES = frozenset(
     dis.opmap[name]
-    for name in ("RETURN_VALUE", "RETURN_CONST", "YIELD_VALUE",
-                 "YIELD_FROM", "RESUME")
+    for name in ("RETURN_VALUE", "RETURN_CONST", "YIELD_VALUE", "RESUME")
     if name in dis.opmap
 )
 from typing import List
@@ -60,6 +59,8 @@ def format_exception(exception):
     message = safe_str(exception)
     return f"{name}: {message}" if message else name
 
+YIELD_FROM = dis.opmap.get("YIELD_FROM")
+
 def is_unwinding(frame, retval):
     """
     sys.setprofile() reports an exception leaving a frame as a return
@@ -67,7 +68,14 @@ def is_unwinding(frame, retval):
     """
     if retval is not None:
         return False
-    return frame.f_code.co_code[frame.f_lasti] not in EXIT_OPCODES
+    code = frame.f_code.co_code
+    if code[frame.f_lasti] in EXIT_OPCODES:
+        return False
+    # Up to Python 3.10, a frame suspended in 'await' or 'yield from'
+    # is left pointing at the instruction before its YIELD_FROM.  One
+    # that points at the YIELD_FROM itself had an exception come out of it.
+    following = frame.f_lasti + 2
+    return following >= len(code) or code[following] != YIELD_FROM
 
 def get_line_number(code, instruction_offset):
     if code is None:
