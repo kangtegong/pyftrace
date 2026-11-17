@@ -1,4 +1,8 @@
 import json
+import mmap
+import os
+import struct
+import tempfile
 
 INDENT = "    "
 
@@ -62,6 +66,42 @@ def format_json(event):
     Render a trace event as one JSON object per line.
     """
     return json.dumps(event, ensure_ascii=False)
+
+class LineCounter:
+    """
+    A number in a small file that every process of the traced program
+    maps into its memory, so that --max-lines limits what all of them
+    print together.
+
+    Nothing keeps two processes from updating it at the same moment.
+    The limit can be overrun by a line or two then, which is cheaper
+    than taking a lock for every line of trace.
+    """
+    FORMAT = "q"
+
+    def __init__(self, path=None):
+        size = struct.calcsize(self.FORMAT)
+        if path is None:
+            fd, path = tempfile.mkstemp(prefix="pyftrace-lines-")
+            os.write(fd, bytes(size))
+        else:
+            fd = os.open(path, os.O_RDWR)
+        self.path = path
+        self.map = mmap.mmap(fd, size)
+        os.close(fd)
+
+    @property
+    def value(self):
+        return struct.unpack_from(self.FORMAT, self.map)[0]
+
+    def increment(self):
+        struct.pack_into(self.FORMAT, self.map, 0, self.value + 1)
+
+    def remove(self):
+        try:
+            os.remove(self.path)
+        except OSError:
+            pass
 
 class Frame:
     """

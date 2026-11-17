@@ -541,6 +541,28 @@ Results: ret_a, ret_b
         """
         self.check_processes([])
 
+    def test_processes_max_lines(self):
+        """
+        Test that '--max-lines' limits the lines of all processes together.
+        """
+        args = ['--max-lines', '3', self.processes_script]
+        result = self.run_pyftrace(args)
+
+        expected_output = f"""Running script: {self.processes_script}
+    Called main from line 16
+[pid N]     Called worker from line N
+[pid N]         Called square from line 7
+... trace truncated after 3 lines"""
+
+        actual = re.sub(r"\[pid \d+\]", "[pid N]", result.stdout)
+        actual = re.sub(r"(Called worker from line) \d+", r"\1 N", actual)
+
+        normalized_expected = self.normalize_output(expected_output)
+        normalized_actual = self.normalize_output(actual)
+
+        self.assertEqual(normalized_expected, normalized_actual)
+        self.assertEqual(result.returncode, 0)
+
     def test_processes_report(self):
         """
         Test that '--report' includes the calls made in a child process.

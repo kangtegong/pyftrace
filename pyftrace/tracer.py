@@ -11,7 +11,7 @@ from abc import ABC, abstractmethod
 from .utils import find_import_end_line, find_module_file
 from .utils import format_exception, safe_str
 from .utils import path_matches
-from .output import Collapser, format_text
+from .output import Collapser, LineCounter, format_text
 from . import multiproc
 
 # Marks a function exit that has no value to show
@@ -75,7 +75,8 @@ class PyftraceBase(ABC):
         self.format = format_text
         # Fold repeated calls, see Collapser
         self.collapse = False
-        self.emitted_lines = 0
+        # Counts the lines of all processes; needed for --max-lines only
+        self.line_counter = None
         self.trace_arguments = trace_arguments
 
         # Get the standard library directory
@@ -160,6 +161,8 @@ class PyftraceBase(ABC):
         multiproc.follow(self)
         if self.report_mode:
             self.report_dir = tempfile.mkdtemp(prefix="pyftrace-report-")
+        if self.max_lines is not None:
+            self.line_counter = LineCounter()
 
         self.tracing_started = False
         self.setup_tracing()
@@ -174,6 +177,8 @@ class PyftraceBase(ABC):
             self.tracing_started = False
             for collapser in self.collapsers:
                 collapser.finish()
+            if self.line_counter and self.pid is None:
+                self.line_counter.remove()
             self.cleanup_tracing()
             sys.path = old_sys_path
             sys.argv = old_sys_argv
@@ -221,6 +226,8 @@ class PyftraceBase(ABC):
                 "file_exclude": self.file_exclude,
                 "output_path": self.output_path,
                 "report_dir": self.report_dir,
+                "line_counter_path": (self.line_counter.path
+                                      if self.line_counter else None),
                 "script_name": self.script_name,
                 "script_dir": self.script_dir,
                 "import_end_line": self.import_end_line,
@@ -377,7 +384,9 @@ class PyftraceBase(ABC):
         return self.max_depth is None or self.current_depth() <= self.max_depth
 
     def is_truncated(self):
-        return self.max_lines is not None and self.emitted_lines > self.max_lines
+        if self.line_counter is None:
+            return False
+        return self.line_counter.value > self.max_lines
 
     def emit_call(self, func_name, def_location, call_file, call_line,
                   arguments=""):
@@ -429,7 +438,8 @@ class PyftraceBase(ABC):
         with self.output_lock:
             if self.is_truncated():
                 return
-            self.emitted_lines += 1
+            if self.line_counter:
+                self.line_counter.increment()
             if self.is_truncated():
                 event = {"event": "truncated", "max_lines": self.max_lines}
             self.output_stream.write(self.format(event) + "\n")
@@ -530,8 +540,11 @@ def tracer_from_config(config):
                              encoding="utf-8")
 
     tracer = get_tracer(output_stream=output_stream, **config["arguments"])
+    counter_path = attributes.pop("line_counter_path")
     for name, value in attributes.items():
         setattr(tracer, name, value)
+    if counter_path:
+        tracer.line_counter = LineCounter(counter_path)
     tracer.pid = os.getpid()
     tracer.owns_output = bool(attributes["output_path"])
     return tracer
