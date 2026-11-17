@@ -123,6 +123,8 @@ def tui_main(stdscr, trace_lines):
 
         def parse_trace_line(line):
             is_windows = platform.system() == 'Windows'
+            # Drop the '[pid N tid M]' mark of a child process or thread
+            line = re.sub(r'^\[[^\]]*\]\s*', '', line)
 
             if is_windows:
                 # for windows
@@ -133,7 +135,7 @@ def tui_main(stdscr, trace_lines):
                     line
                 )
                 return_match = re.match(
-                    r'(?P<indent>\s*)Returning\s+(?P<func_name>[<>?\w]+)'
+                    r'(?P<indent>\s*)(?P<verb>Returning|Raised)\s+(?P<func_name>[<>?\w]+)'
                     r'(?:\s*->\s*(?P<retval>[^@]+))?'
                     r'(?:\s*@\s*(?P<file_path>.+))?$',
                     line
@@ -147,7 +149,7 @@ def tui_main(stdscr, trace_lines):
                     line
                 )
                 return_match = re.match(
-                    r'(?P<indent>\s*)Returning\s+(?P<func_name>[<>?\w]+)'
+                    r'(?P<indent>\s*)(?P<verb>Returning|Raised)\s+(?P<func_name>[<>?\w]+)'
                     r'(?:\s*->\s*(?P<retval>[^@]+))?'
                     r'(?:\s*@\s*(?P<file_path>[^@]+))?$',
                     line
@@ -176,6 +178,7 @@ def tui_main(stdscr, trace_lines):
 
                 return {
                     "type": "return",
+                    "raised": return_match.group("verb") == "Raised",
                     "func_name": func_name,
                     "retval": retval,
                     "file_path": file_path,
@@ -190,19 +193,15 @@ def tui_main(stdscr, trace_lines):
             Simplify trace lines to 'Called {function}' or 'Returning {function}' format.
             Keep indentation and remove '@' and any following information.
             """
-            call_match = re.match(r'(?P<indent>\s*)Called\s+(?P<func_name>[<>?\w]+)', line)
-            return_match = re.match(r'(?P<indent>\s*)Returning\s+(?P<func_name>[<>?\w]+)', line)
-
-            if call_match:
-                indent = call_match.group('indent')
-                func_name = call_match.group('func_name')
-                return f"{indent}Called {func_name}"
-            elif return_match:
-                indent = return_match.group('indent')
-                func_name = return_match.group('func_name')
-                return f"{indent}Returning {func_name}"
-            else:
-                return line  # Return original line if it cannot be simplified
+            # The indentation may follow a '[pid N tid M]' mark
+            match = re.match(
+                r'(?P<indent>(?:\[[^\]]*\] )?\s*)'
+                r'(?P<verb>Called|Returning|Raised)\s+(?P<func_name>[<>?\w]+)',
+                line
+            )
+            if match:
+                return f"{match.group('indent')}{match.group('verb')} {match.group('func_name')}"
+            return line  # Return original line if it cannot be simplified
 
         # Precompute simplified lines for performance
         simplified_lines = [simplify_trace_line(line.rstrip('\n')) for line in trace_lines]
@@ -266,7 +265,9 @@ def tui_main(stdscr, trace_lines):
 
                         detail_window.addstr(1, 2, f"[ Function Name ] {func_name}", DETAIL_COLOR)
                         # Do not display retval if it's a built-in function
-                        if retval:
+                        if retval and parsed_data["raised"]:
+                            detail_window.addstr(2, 2, f"[ Exception ] {retval}", DETAIL_COLOR)
+                        elif retval:
                             detail_window.addstr(2, 2, f"[ Return Value ] {retval}", DETAIL_COLOR)
                         if file_path:
                             detail_window.addstr(3, 2, f"[ Returned From ] {file_path}", DETAIL_COLOR)
