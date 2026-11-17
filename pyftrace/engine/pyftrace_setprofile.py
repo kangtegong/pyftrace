@@ -18,6 +18,11 @@ class PyftraceSetprofile(PyftraceBase):
     def setup_tracing(self):
         # sys.setprofile() is per thread: hook the threads started later too
         self.stopped = False
+        # Code objects whose calls and returns need no handling at all
+        self.ignored_codes = set()
+        # C functions are shown with --verbose only, but -e can name one
+        # to hide the Python functions it calls back
+        self.ignore_c_events = not self.verbose and not self.function_exclude
         threading.setprofile(self.profile_func)
         sys.setprofile(self.profile_func)
 
@@ -28,7 +33,16 @@ class PyftraceSetprofile(PyftraceBase):
         self.stopped = True
 
     def profile_func(self, frame, event, arg):
-        if self.stopped or self.thread_state.muted:
+        # This runs for every call the program and its libraries make.
+        # Get rid of the ones that cannot matter as cheaply as possible.
+        if self.stopped:
+            return
+        if event == "call" or event == "return":
+            if frame.f_code in self.ignored_codes and self.tracing_started:
+                return
+        elif self.ignore_c_events and self.tracing_started:
+            return
+        if self.thread_state.muted:
             return
         if event == "call":
             self.handle_call_event(frame, arg, is_c_call=False)
@@ -43,6 +57,19 @@ class PyftraceSetprofile(PyftraceBase):
             self.handle_return_event(frame, arg, is_c_return=True, raised=True)
         else:
             pass
+
+    def ignore_code(self, code, filename):
+        """
+        Whether a Python function is traced depends on where it is
+        defined and on the options.  Once it is known that one is not,
+        profile_func() does not have to look at it again.
+        """
+        if code is None:
+            return
+        # The top-level code of the script ends the trace when it returns
+        if filename == self.script_name and code.co_name == '<module>':
+            return
+        self.ignored_codes.add(code)
 
     def handle_call_event(self, frame, arg, is_c_call=False):
         if is_c_call:
@@ -87,12 +114,14 @@ class PyftraceSetprofile(PyftraceBase):
 
         # Module and class bodies are not traced
         if code and not is_function_code(code):
+            self.ignore_code(code, filename)
             return
 
         trace_this = False
 
         if self.is_stdlib_code(filename):
             if not self.verbose:
+                self.ignore_code(code, filename)
                 return
             trace_this = True
         else:
@@ -110,6 +139,9 @@ class PyftraceSetprofile(PyftraceBase):
         # For a C function, frame is the caller: it belongs to that file
         owner = filename or frame.f_code.co_filename
         trace_this = trace_this and self.file_selected(owner)
+
+        if not trace_this and func_name not in self.function_exclude:
+            self.ignore_code(code, filename)
 
         if self.function_exclude and func_name in self.function_exclude:
             self.exclude_depth += 1
