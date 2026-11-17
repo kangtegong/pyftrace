@@ -98,13 +98,13 @@ class PyftraceMonitoring(PyftraceBase):
                 if self.verbose and self.should_trace(def_filename):
                     trace_this = True
 
-        if self.function_exclude and func_name == self.function_exclude:
+        if self.function_exclude and func_name in self.function_exclude:
             self.exclude_depth += 1
         if self.exclude_depth > 0:
             return
 
         if self.function_filter:
-            if func_name == self.function_filter and trace_this:
+            if func_name in self.function_filter and trace_this:
                 self.filter_depth += 1
             if self.filter_depth == 0 or not trace_this:
                 return
@@ -149,7 +149,7 @@ class PyftraceMonitoring(PyftraceBase):
             return
 
         if self.exclude_depth > 0:
-            if self.function_exclude and func_name == self.function_exclude:
+            if self.function_exclude and func_name in self.function_exclude:
                 self.exclude_depth -= 1
             return
 
@@ -158,7 +158,7 @@ class PyftraceMonitoring(PyftraceBase):
         if self.function_filter:
             if self.filter_depth == 0:
                 return
-            if func_name == self.function_filter and trace_this:
+            if func_name in self.function_filter and trace_this:
                 self.filter_depth -= 1
 
         if trace_this and not self.is_tracer_code(filename):
@@ -213,7 +213,7 @@ class PyftraceMonitoring(PyftraceBase):
                 trace_this = True
 
         if self.exclude_depth > 0:
-            if self.function_exclude and func_name == self.function_exclude:
+            if self.function_exclude and func_name in self.function_exclude:
                 self.exclude_depth -= 1
             return
 

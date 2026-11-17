@@ -42,8 +42,8 @@ def main():
     parser.add_argument('-r', '--report', action='store_true', help="Generate a report of function execution times")
     parser.add_argument('-d', '--depth', type=int, help="Limit the tracing output to DEPTH")
     parser.add_argument('-n', '--max-lines', type=int, metavar='LINES', help="Stop printing the trace after LINES lines. The program keeps running")
-    parser.add_argument('-f', '--function', help="Trace only calls of <function> and its subcalls")
-    parser.add_argument('-e', '--exclude-function', help="Exclude calls of <function> (and its subcalls) from tracing")
+    parser.add_argument('-f', '--function', action='append', help="Trace only calls of <function> and its subcalls. Can be repeated")
+    parser.add_argument('-e', '--exclude-function', action='append', help="Exclude calls of <function> (and its subcalls) from tracing. Can be repeated")
     parser.add_argument('-a', '--argument', action='store_true', help="Show function arguments in tracing output (Python frames only)")
     parser.add_argument('-o', '--output', help="Write tracing output to a file. The traced program's own output is not redirected")
 

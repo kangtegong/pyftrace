@@ -329,6 +329,48 @@ Results: ret_a, ret_b"""
         self.assertEqual(result.stdout.count("Returning countdown"), 51)
         self.assertEqual(result.returncode, 0)
 
+    def test_function_filter_multiple(self):
+        """
+        Test '--function' given more than once.
+        """
+        args = ['-f', 'function_a', '-f', 'function_b', self.main_script]
+        result = self.run_pyftrace(args)
+
+        expected_output = f"""Running script: {self.main_script}
+    Called function_a from line 5
+Function A is called.
+    Returning function_a-> ret_a
+    Called function_b from line 6
+Function B is called.
+    Returning function_b-> ret_b
+Results: ret_a, ret_b"""
+
+        normalized_expected = self.normalize_output(expected_output)
+        normalized_actual = self.normalize_output(result.stdout)
+
+        self.assertEqual(normalized_expected, normalized_actual)
+        self.assertEqual(result.returncode, 0)
+
+    def test_exclude_function_multiple(self):
+        """
+        Test '--exclude-function' given more than once.
+        """
+        args = ['-e', 'function_a', '-e', 'function_b', self.main_script]
+        result = self.run_pyftrace(args)
+
+        expected_output = f"""Running script: {self.main_script}
+    Called main from line 10
+Function A is called.
+Function B is called.
+Results: ret_a, ret_b
+    Returning main-> None"""
+
+        normalized_expected = self.normalize_output(expected_output)
+        normalized_actual = self.normalize_output(result.stdout)
+
+        self.assertEqual(normalized_expected, normalized_actual)
+        self.assertEqual(result.returncode, 0)
+
     # def test_tracing_script_path(self):
     #     """
     #     Test '--path' flag to include file paths in tracing.

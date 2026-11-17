@@ -83,8 +83,8 @@ $ pip install pyftrace
 - `--version` or `-V`: Display help information about pyftrace and its options.
 - `--depth` or `-d`: Limit the depth of the function to be traced. 
 - `--max-lines` or `-n <lines>`: Stop printing the trace after the given number of lines. The traced program keeps running to the end.
-- `--function` or `-f`: Filter the names of function to be traced.
-- `--exclude-function` or `-e`: Exclude the specified function from the trace. 
+- `--function` or `-f`: Filter the names of function to be traced. Can be given more than once.
+- `--exclude-function` or `-e`: Exclude the specified function from the trace. Can be given more than once.
 
 ## TUI
 

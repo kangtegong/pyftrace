@@ -34,9 +34,10 @@ class PyftraceBase(ABC):
             [paths["stdlib"], paths["platstdlib"]])
         self.site_dirs = self.find_site_dirs()
 
-        self.function_filter = function_filter
+        # Sets of function names given with -f and -e
+        self.function_filter = frozenset(function_filter or ())
         self.filter_depth = 0
-        self.function_exclude = function_exclude
+        self.function_exclude = frozenset(function_exclude or ())
         self.exclude_depth = 0
 
     @abstractmethod
