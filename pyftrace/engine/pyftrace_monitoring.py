@@ -17,6 +17,7 @@ class PyftraceMonitoring(PyftraceBase):
 
     def setup_tracing(self):
         self.tool_id = 1
+        self.ignored_codes = {}
         sys.monitoring.use_tool_id(self.tool_id, "pyftrace")
         sys.monitoring.register_callback(self.tool_id, sys.monitoring.events.PY_START, self.monitor_py_start)
         sys.monitoring.register_callback(self.tool_id, sys.monitoring.events.PY_RESUME, self.monitor_py_start)
@@ -48,15 +49,16 @@ class PyftraceMonitoring(PyftraceBase):
 
     def monitor_py_start(self, code, instruction_offset):
         # The callback is called from the frame of the function
-        self.handle_py_start_event(code, sys._getframe(1))
+        return self.handle_py_start_event(code, sys._getframe(1))
 
     def monitor_call(self, code, instruction_offset, callable_obj, arg0):
         self.handle_call_event(code, instruction_offset, callable_obj)
 
     def monitor_py_return(self, code, instruction_offset, retval):
-        self.handle_py_return_event(code, instruction_offset, retval)
+        return self.handle_py_return_event(code, instruction_offset, retval)
 
     def monitor_py_unwind(self, code, instruction_offset, exception):
+        # Unlike the other events, PY_UNWIND cannot be disabled
         self.handle_py_return_event(code, instruction_offset, None, exception)
 
     def monitor_c_return(self, code, instruction_offset, callable_obj, arg0):
@@ -66,11 +68,49 @@ class PyftraceMonitoring(PyftraceBase):
         self.handle_c_return_event(code, instruction_offset, callable_obj,
                                    raised=True)
 
+    def is_traceable_file(self, file_name):
+        """
+        True if the Python functions defined in this file are traced.
+        """
+        if self.is_tracer_code(file_name) or self.is_stdlib_code(file_name):
+            return False
+        if not self.should_trace(file_name) and not self.verbose:
+            return False
+        return self.file_selected(file_name)
+
+    def is_ignored_code(self, code):
+        """
+        True if nothing this code object does is of interest, now or
+        later.  Its events are then switched off for good, which is
+        what keeps the cost of the library code in a program low.
+        """
+        try:
+            return self.ignored_codes[code]
+        except KeyError:
+            pass
+
+        file_name = os.path.abspath(code.co_filename)
+        if not is_function_code(code):
+            # The top-level code of the script is what starts the trace
+            ignored = (file_name != self.script_name
+                       or code.co_name != '<module>')
+        elif code.co_name in self.function_exclude:
+            # -e hides what such a function calls, wherever it is defined
+            ignored = False
+        else:
+            ignored = not self.is_traceable_file(file_name)
+
+        self.ignored_codes[code] = ignored
+        return ignored
+
     def handle_py_start_event(self, code, frame):
         """
         A Python function starts running.  Unlike CALL, this is also
         reported when the function is called from C code, e.g. by map().
         """
+        if self.is_ignored_code(code):
+            return sys.monitoring.DISABLE
+
         func_name = code.co_name
         def_filename = os.path.abspath(code.co_filename)
 
@@ -80,7 +120,7 @@ class PyftraceMonitoring(PyftraceBase):
                 self.tracing_started = True
             return
 
-        if not is_function_code(code) or self.is_tracer_code(def_filename):
+        if not is_function_code(code):
             return
 
         caller = frame.f_back
@@ -92,10 +132,7 @@ class PyftraceMonitoring(PyftraceBase):
         if call_filename:
             call_filename = os.path.abspath(call_filename)
 
-        trace_this = False
-        if not self.is_stdlib_code(def_filename):
-            trace_this = self.should_trace(def_filename) or self.verbose
-        trace_this = trace_this and self.file_selected(def_filename)
+        trace_this = self.is_traceable_file(def_filename)
 
         arguments = ""
         if self.trace_arguments and trace_this:
@@ -175,6 +212,9 @@ class PyftraceMonitoring(PyftraceBase):
                     self.execution_report[func_name] = (start_time, 0, 1)
 
     def handle_py_return_event(self, code, instruction_offset, retval, exception=None):
+        if code and self.is_ignored_code(code):
+            return sys.monitoring.DISABLE
+
         if not self.tracing_started:
             return
 
@@ -192,8 +232,7 @@ class PyftraceMonitoring(PyftraceBase):
                 self.exclude_depth -= 1
             return
 
-        trace_this = self.should_trace(filename) or self.verbose
-        trace_this = trace_this and self.file_selected(filename)
+        trace_this = self.is_traceable_file(filename)
 
         if self.function_filter:
             if self.filter_depth == 0:
