@@ -327,6 +327,11 @@ class PyftraceBase(ABC):
             total_time, call_count = self.execution_report.get(func_name, (0, 0))
             self.execution_report[func_name] = (total_time + exec_time, call_count + 1)
 
+        # A child process may be killed without warning, as the workers
+        # of a multiprocessing pool are.  Do not wait for its end.
+        if self.pid is not None and not state.start_times:
+            self.save_child_report()
+
     def save_child_report(self):
         """
         Leave the report of a child process where the process that
@@ -335,9 +340,12 @@ class PyftraceBase(ABC):
         if not self.report_dir or not self.execution_report:
             return
         path = os.path.join(self.report_dir, f"{os.getpid()}.json")
+        # The process can be killed at any point.  Replace the file in
+        # one step so that a complete report is there at all times.
         try:
-            with open(path, "w") as file:
+            with open(path + ".tmp", "w") as file:
                 json.dump(self.execution_report, file)
+            os.replace(path + ".tmp", path)
         except OSError:
             pass
 
@@ -346,8 +354,10 @@ class PyftraceBase(ABC):
             return
         for name in os.listdir(self.report_dir):
             path = os.path.join(self.report_dir, name)
-            with open(path) as file:
-                child_report = json.load(file)
+            child_report = {}
+            if name.endswith(".json"):
+                with open(path) as file:
+                    child_report = json.load(file)
             os.remove(path)
             for func_name, (child_time, child_count) in child_report.items():
                 total_time, call_count = self.execution_report.get(func_name, (0, 0))
