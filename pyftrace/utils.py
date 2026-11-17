@@ -1,7 +1,16 @@
 import sys
 import os
 import weakref
+import dis
 import importlib.util
+
+# A frame that returns or yields normally stops at one of these
+EXIT_OPCODES = frozenset(
+    dis.opmap[name]
+    for name in ("RETURN_VALUE", "RETURN_CONST", "YIELD_VALUE",
+                 "YIELD_FROM", "RESUME")
+    if name in dis.opmap
+)
 from typing import List
 
 def resolve_filename(code, callable_obj):
@@ -43,6 +52,15 @@ def format_exception(exception):
     except Exception:
         return name
     return f"{name}: {message}" if message else name
+
+def is_unwinding(frame, retval):
+    """
+    sys.setprofile() reports an exception leaving a frame as a return
+    of None.  Tell the two apart by the instruction the frame stopped at.
+    """
+    if retval is not None:
+        return False
+    return frame.f_code.co_code[frame.f_lasti] not in EXIT_OPCODES
 
 def get_line_number(code, instruction_offset):
     if code is None:

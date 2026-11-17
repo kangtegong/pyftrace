@@ -21,6 +21,7 @@ class PyftraceTests(unittest.TestCase):
         cls.main_script = os.path.join(cls.project_root, 'examples', 'module_trace', 'main_script.py')
         cls.module_a = os.path.join(cls.project_root, 'examples', 'module_trace', 'module_a.py')
         cls.module_b = os.path.join(cls.project_root, 'examples', 'module_trace', 'module_b.py')
+        cls.exception_script = os.path.join(cls.project_root, 'examples', 'exception.py')
         cls.add_script = os.path.join(cls.project_root, 'examples', 'add.py')
         cls.temp_output = os.path.join(cls.project_root, 'tests', 'tmp_output.txt')
 
@@ -261,6 +262,37 @@ The sum of 3.0 and 5.0 is 8.0"""
 
         normalized_expected = self.normalize_output(expected_output)
         normalized_actual = self.normalize_output(result.stdout)
+
+        self.assertEqual(normalized_expected, normalized_actual)
+        self.assertEqual(result.returncode, 0)
+
+    def test_exception(self):
+        """
+        Test that a function left by an exception is unwound.
+        """
+        result = self.run_pyftrace([self.exception_script])
+
+        expected_output = f"""Running script: {self.exception_script}
+    Called safe_load from line 13
+        Called load from line 9
+            Called parse from line 5
+            Returning parse-> 1
+        Returning load-> 2
+    Returning safe_load-> 2
+    Called safe_load from line 14
+        Called load from line 9
+            Called parse from line 5
+            Raised parse
+        Raised load
+    Returning safe_load-> -1"""
+
+        # Only the sys.monitoring engine knows which exception it was
+        actual = re.sub(r"(Raised \w+)-> .*", r"\1", result.stdout)
+        if sys.version_info >= (3, 12):
+            self.assertIn("Raised parse-> ValueError: invalid literal", result.stdout)
+
+        normalized_expected = self.normalize_output(expected_output)
+        normalized_actual = self.normalize_output(actual)
 
         self.assertEqual(normalized_expected, normalized_actual)
         self.assertEqual(result.returncode, 0)

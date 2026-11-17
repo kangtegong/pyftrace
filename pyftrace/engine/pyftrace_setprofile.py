@@ -4,6 +4,7 @@ import time
 import sysconfig
 from ..tracer import PyftraceBase
 from ..utils import resolve_filename, format_arguments, callable_name
+from ..utils import is_unwinding
 
 class PyftraceSetprofile(PyftraceBase):
     """
@@ -23,13 +24,14 @@ class PyftraceSetprofile(PyftraceBase):
         if event == "call":
             self.handle_call_event(frame, arg, is_c_call=False)
         elif event == "return":
-            self.handle_return_event(frame, arg, is_c_return=False)
+            self.handle_return_event(frame, arg, is_c_return=False,
+                                     raised=is_unwinding(frame, arg))
         elif event == "c_call":
             self.handle_call_event(frame, arg, is_c_call=True)
         elif event == "c_return":
             self.handle_return_event(frame, arg, is_c_return=True)
         elif event == "c_exception":
-            pass
+            self.handle_return_event(frame, arg, is_c_return=True, raised=True)
         else:
             pass
 
@@ -159,7 +161,7 @@ class PyftraceSetprofile(PyftraceBase):
                 else:
                     self.execution_report[func_name] = (start_time, 0, 1)
 
-    def handle_return_event(self, frame, arg, is_c_return):
+    def handle_return_event(self, frame, arg, is_c_return, raised=False):
         if not self.tracing_started:
             return
 
@@ -216,7 +218,10 @@ class PyftraceSetprofile(PyftraceBase):
             else:
                 file_info = ""
 
-            if self.should_emit():
+            if self.should_emit() and raised:
+                # The exception itself is not passed to a profile function
+                self.emit(f"{indent}Raised {func_name}{file_info}")
+            elif self.should_emit():
                 return_value = ''
                 if not is_c_return:
                     return_value = f"-> {arg}"
