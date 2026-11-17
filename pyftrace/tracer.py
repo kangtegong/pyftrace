@@ -4,6 +4,7 @@ import runpy
 import site
 import sysconfig
 import threading
+import time
 from abc import ABC, abstractmethod
 from .utils import find_import_end_line, find_module_file
 from .utils import format_exception, safe_str
@@ -283,6 +284,23 @@ class PyftraceBase(ABC):
         # The header is not part of the trace: --max-lines does not count it
         if self.output_stream:
             print(self.format(event), file=self.output_stream)
+
+    def report_call(self, func_name):
+        if not self.report_mode:
+            return
+        start_time = time.time()
+        if func_name in self.execution_report:
+            _, total_time, call_count = self.execution_report[func_name]
+            self.execution_report[func_name] = (start_time, total_time, call_count + 1)
+        else:
+            self.execution_report[func_name] = (start_time, 0, 1)
+
+    def report_return(self, func_name):
+        if not self.report_mode or func_name not in self.execution_report:
+            return
+        start_time, total_time, call_count = self.execution_report[func_name]
+        exec_time = time.time() - start_time
+        self.execution_report[func_name] = (start_time, total_time + exec_time, call_count)
 
     def print_report(self, stream=None):
         stream = stream or self.output_stream or sys.stdout

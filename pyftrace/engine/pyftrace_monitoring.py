@@ -1,6 +1,5 @@
 import sys
 import os
-import time
 import weakref
 import sysconfig
 from ..tracer import PyftraceBase
@@ -204,13 +203,7 @@ class PyftraceMonitoring(PyftraceBase):
             self.emit_call(func_name, def_location, call_filename, call_lineno,
                            arguments)
 
-            if self.report_mode:
-                start_time = time.time()
-                if func_name in self.execution_report:
-                    _, total_time, call_count = self.execution_report[func_name]
-                    self.execution_report[func_name] = (start_time, total_time, call_count + 1)
-                else:
-                    self.execution_report[func_name] = (start_time, 0, 1)
+            self.report_call(func_name)
 
     def handle_py_return_event(self, code, instruction_offset, retval, exception=None):
         if code and self.is_ignored_code(code):
@@ -246,10 +239,7 @@ class PyftraceMonitoring(PyftraceBase):
                 self.emit_exit(func_name, filename, value=retval,
                                exception=exception)
 
-                if self.report_mode and func_name in self.execution_report:
-                    start_time, total_time, call_count = self.execution_report[func_name]
-                    exec_time = time.time() - start_time
-                    self.execution_report[func_name] = (start_time, total_time + exec_time, call_count)
+                self.report_return(func_name)
 
                 self.call_stack.pop()
 
@@ -291,10 +281,7 @@ class PyftraceMonitoring(PyftraceBase):
             if self.call_stack and self.call_stack[-1][0] == func_name:
                 self.emit_exit(func_name, filename, raised=raised)
 
-                if self.report_mode and func_name in self.execution_report:
-                    start_time, total_time, call_count = self.execution_report[func_name]
-                    exec_time = time.time() - start_time
-                    self.execution_report[func_name] = (start_time, total_time + exec_time, call_count)
+                self.report_return(func_name)
 
                 self.call_stack.pop()
 

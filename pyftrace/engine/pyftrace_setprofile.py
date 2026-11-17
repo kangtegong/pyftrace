@@ -1,6 +1,5 @@
 import sys
 import os
-import time
 import sysconfig
 import threading
 from ..tracer import PyftraceBase
@@ -177,13 +176,7 @@ class PyftraceSetprofile(PyftraceBase):
             self.emit_call(func_name, def_location, call_filename, call_lineno,
                            arguments)
 
-            if self.report_mode:
-                start_time = time.time()
-                if func_name in self.execution_report:
-                    _, total_time, call_count = self.execution_report[func_name]
-                    self.execution_report[func_name] = (start_time, total_time, call_count + 1)
-                else:
-                    self.execution_report[func_name] = (start_time, 0, 1)
+            self.report_call(func_name)
 
     def handle_return_event(self, frame, arg, is_c_return, raised=False):
         if not self.tracing_started:
@@ -260,10 +253,7 @@ class PyftraceSetprofile(PyftraceBase):
             else:
                 self.emit_exit(func_name, filename, value=arg)
 
-            if self.report_mode and func_name in self.execution_report:
-                start_time, total_time, call_count = self.execution_report[func_name]
-                exec_time = time.time() - start_time
-                self.execution_report[func_name] = (start_time, total_time + exec_time, call_count)
+            self.report_return(func_name)
 
             self.call_stack.pop()
 
