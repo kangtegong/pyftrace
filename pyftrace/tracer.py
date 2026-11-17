@@ -43,6 +43,10 @@ class PyftraceBase(ABC):
         self.main_thread = threading.get_ident()
         self.output_lock = threading.Lock()
         self.collapsers = []
+        # Shown with every event of a child process; None in the process
+        # that pyftrace was started in
+        self.pid = None
+        self.fork_hooked = False
         self.tracer_script = os.path.abspath(__file__)
         self.tracer_dir = os.path.dirname(self.tracer_script)
         self.tracing_started = False
@@ -137,6 +141,8 @@ class PyftraceBase(ABC):
         self.main_thread = threading.get_ident()
         self.thread_states = threading.local()
 
+        self.follow_forks()
+
         self.tracing_started = False
         self.setup_tracing()
 
@@ -152,6 +158,25 @@ class PyftraceBase(ABC):
             self.cleanup_tracing()
             sys.path = old_sys_path
             sys.argv = old_sys_argv
+
+    def follow_forks(self):
+        """
+        A forked child keeps tracing with a copy of this tracer.  Have
+        it start from a clean state under its own pid.
+        """
+        if self.fork_hooked or not hasattr(os, "register_at_fork"):
+            return
+        os.register_at_fork(after_in_child=self.enter_child)
+        self.fork_hooked = True
+
+    def enter_child(self):
+        self.pid = os.getpid()
+        # The forking thread is the only one left and is now the main one
+        self.main_thread = threading.get_ident()
+        self.thread_states = threading.local()
+        # Another thread may have held the lock when the process forked
+        self.output_lock = threading.Lock()
+        self.collapsers = []
 
     @staticmethod
     def wait_for_threads():
@@ -263,6 +288,8 @@ class PyftraceBase(ABC):
 
     def emit(self, event):
         state = self.thread_state
+        if self.pid is not None:
+            event["pid"] = self.pid
         if state.tid is not None:
             event["tid"] = state.tid
         if state.collapser:

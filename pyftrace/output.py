@@ -2,14 +2,19 @@ import json
 
 INDENT = "    "
 
+# The fields that tell which process and thread an event comes from.
+# The process and the thread pyftrace was started in have neither.
+ORIGIN_KEYS = ("pid", "tid")
+
 def format_text(event):
     """
     Render a trace event as a line of the classic pyftrace output.
     """
     kind = event["event"]
     indent = INDENT * event.get("depth", 0)
-    if "tid" in event:
-        indent = f"[tid {event['tid']}] {indent}"
+    origin = [f"{key} {event[key]}" for key in ORIGIN_KEYS if key in event]
+    if origin:
+        indent = f"[{' '.join(origin)}] {indent}"
 
     if kind == "call":
         function = event["function"]
@@ -171,9 +176,8 @@ class Collapser:
         if frame.count == 0:
             return
         event = {"event": "repeat", "depth": level + 1, "count": frame.count}
-        # Carry over what identifies the thread
         first = frame.previous[0]
-        event.update((key, first[key]) for key in ("tid",) if key in first)
+        event.update((key, first[key]) for key in ORIGIN_KEYS if key in first)
         frame.count = 0
         self.write(level, event)
 
