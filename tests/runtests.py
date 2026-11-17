@@ -5,6 +5,10 @@ import os
 import re
 import json
 import importlib.util
+import shutil
+import tempfile
+import textwrap
+import time
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
@@ -87,6 +91,47 @@ class PyftraceTestCase(unittest.TestCase):
         # Standardize path separators for Windows
         normalized = normalized.replace("\r\n", "\n").replace("\\", "/")
         return normalized
+
+    def run_source(self, source, args=(), script_args=()):
+        """
+        Run pyftrace on a script given as source text.  The script is
+        written to a temporary directory that is removed after the test.
+        """
+        directory = tempfile.mkdtemp(prefix="pyftrace-test-")
+        self.addCleanup(shutil.rmtree, directory, True)
+        self.script = os.path.join(directory, "script.py")
+        with open(self.script, "w") as f:
+            f.write(textwrap.dedent(source))
+        return self.run_pyftrace(list(args) + [self.script] + list(script_args))
+
+    @staticmethod
+    def trace_lines(text):
+        """
+        The trace lines in the output of pyftrace, with their
+        indentation.  What varies from run to run is replaced: pids,
+        tids, the line of a call made from library code, and the
+        exception named in a 'Raised' line, which only one engine knows.
+        """
+        lines = []
+        for line in text.splitlines():
+            if not re.search(r"(Called|Returning|Raised) |^\.\.\. | \.\.\. ", line):
+                continue
+            line = re.sub(r"\[pid \d+", "[pid N", line)
+            line = re.sub(r"tid \d+\]", "tid N]", line)
+            line = re.sub(r"(Raised \w+)-> .*", r"\1", line)
+            lines.append(line.rstrip())
+        return lines
+
+    def report_calls(self, result):
+        """
+        The rows of a '--report --format json' run as {function: event}.
+        """
+        rows = {}
+        for line in result.stdout.splitlines():
+            if line.startswith('{"event": "report"'):
+                event = json.loads(line)
+                rows[event["function"]] = event
+        return rows
 
 class PyftraceTests(PyftraceTestCase):
     def test_version_flag_short_v(self):
@@ -701,6 +746,282 @@ Results: ret_a, ret_b
     #     self.assertRegex(actual_output, expected_output_pattern)
     #     self.assertEqual(result.returncode, 0)
 
+class OptionTests(PyftraceTestCase):
+    """
+    What each command line option does on its own.
+    """
+
+    def test_path(self):
+        """
+        Test '--path' flag for showing where functions are defined and called.
+        """
+        result = self.run_pyftrace(['--path', self.foobar_script])
+        script = self.foobar_script
+
+        self.assertEqual([
+            f"    Called foo@{script}:1 from {script}:9",
+            f"        Called bar@{script}:6 from {script}:2",
+            f"        Returning bar-> 6 @ {script}",
+            f"        Called bar@{script}:6 from {script}:3",
+            f"        Returning bar-> 14 @ {script}",
+            f"    Returning foo-> 10 @ {script}",
+        ], self.trace_lines(result.stdout))
+        self.assertEqual(result.returncode, 0)
+
+    def test_path_json(self):
+        """
+        Test that '--format json' carries the '--path' information as fields.
+        """
+        args = ['--path', '--format', 'json', self.foobar_script]
+        result = self.run_pyftrace(args)
+        events = [json.loads(line) for line in result.stdout.splitlines()]
+        script = self.foobar_script
+
+        self.assertEqual({"event": "call", "depth": 1, "function": "foo",
+                          "line": 9, "defined_at": f"{script}:1",
+                          "caller_file": script}, events[1])
+        self.assertEqual({"event": "return", "depth": 1, "function": "foo",
+                          "value": "10", "file": script}, events[-1])
+
+    def test_depth(self):
+        """
+        Test '--depth' flag for limiting the depth of the trace.
+        """
+        result = self.run_pyftrace(['--depth', '1', self.foobar_script])
+
+        self.assertEqual([
+            "    Called foo from line 9",
+            "    Returning foo-> 10",
+        ], self.trace_lines(result.stdout))
+
+    def test_max_lines_not_reached(self):
+        """
+        Test that '--max-lines' prints no marker for a trace that fits.
+        """
+        result = self.run_pyftrace(['--max-lines', '6', self.foobar_script])
+
+        self.assertEqual(6, len(self.trace_lines(result.stdout)))
+        self.assertNotIn("truncated", result.stdout)
+
+    def test_report(self):
+        """
+        Test '--report' flag for the table of execution times.
+        """
+        result = self.run_pyftrace(['--report', self.foobar_script])
+
+        self.assertIn("Function Name", result.stdout)
+        self.assertRegex(result.stdout, r"foo\s+\|\s+\d+\.\d+ seconds\s+\|\s+1")
+        self.assertRegex(result.stdout, r"bar\s+\|\s+\d+\.\d+ seconds\s+\|\s+2")
+        # The report replaces the trace
+        self.assertEqual([], self.trace_lines(result.stdout))
+        self.assertEqual(result.returncode, 0)
+
+    def test_report_json(self):
+        """
+        Test '--report' with '--format json'.
+        """
+        args = ['--report', '--format', 'json', self.foobar_script]
+        rows = self.report_calls(self.run_pyftrace(args))
+
+        self.assertEqual({"foo": 1, "bar": 2},
+                         {name: row["calls"] for name, row in rows.items()})
+
+    def test_report_recursive(self):
+        """
+        Test that '--report' counts the time of a recursive function once.
+        """
+        result = self.run_source("""
+            import time
+
+            def nap(depth):
+                time.sleep(0.02)
+                if depth:
+                    nap(depth - 1)
+
+            def main():
+                nap(4)
+
+            main()
+        """, ['--report', '--format', 'json'])
+        rows = self.report_calls(result)
+
+        self.assertEqual(5, rows["nap"]["calls"])
+        # Five nested calls sleep for 0.1 seconds in all
+        self.assertGreater(rows["nap"]["seconds"], 0.09)
+        # All of nap() runs within main()
+        self.assertLessEqual(rows["nap"]["seconds"], rows["main"]["seconds"])
+
+    def test_exclude_function(self):
+        """
+        Test '--exclude-function' flag for hiding a function.
+        """
+        args = ['--exclude-function', 'bar', self.foobar_script]
+        result = self.run_pyftrace(args)
+
+        self.assertEqual([
+            "    Called foo from line 9",
+            "    Returning foo-> 10",
+        ], self.trace_lines(result.stdout))
+
+    def test_exclude_function_recursive(self):
+        """
+        Test that '--exclude-function' hides all levels of a recursion.
+        """
+        result = self.run_source("""
+            def leaf(n):
+                return n
+
+            def fact(n):
+                if n <= 1:
+                    return leaf(1)
+                value = n * fact(n - 1)
+                leaf(value)
+                return value
+
+            def other():
+                return leaf(0)
+
+            fact(3)
+            other()
+        """, ['--exclude-function', 'fact'])
+
+        self.assertEqual([
+            "    Called other from line 16",
+            "        Called leaf from line 13",
+            "        Returning leaf-> 0",
+            "    Returning other-> 0",
+        ], self.trace_lines(result.stdout))
+
+    def test_exclude_function_callback(self):
+        """
+        Test that excluding a C function hides the functions it calls back.
+        """
+        result = self.run_source("""
+            def square(n):
+                return n * n
+
+            def total(values):
+                return sum(map(square, values))
+
+            sorted([2, 1], key=square)
+            total([3])
+        """, ['--exclude-function', 'sorted'])
+
+        self.assertEqual([
+            "    Called total from line 9",
+            "        Called square from line 6",
+            "        Returning square-> 9",
+            "    Returning total-> 9",
+        ], self.trace_lines(result.stdout))
+
+    def test_collapse_nested(self):
+        """
+        Test that '--collapse' folds a repeated call that contains repeats.
+        """
+        result = self.run_source("""
+            def leaf():
+                return 0
+
+            def row():
+                for _ in range(3):
+                    leaf()
+
+            def table():
+                for _ in range(4):
+                    row()
+
+            table()
+        """, ['--collapse'])
+
+        self.assertEqual([
+            "    Called table from line 13",
+            "        Called row from line 11",
+            "            Called leaf from line 7",
+            "            Returning leaf-> 0",
+            "            ... repeated 2 more times",
+            "        Returning row-> None",
+            "        ... repeated 3 more times",
+            "    Returning table-> None",
+        ], self.trace_lines(result.stdout))
+
+    def test_collapse_json(self):
+        """
+        Test that '--collapse' reports the count as an event of its own.
+        """
+        args = ['--collapse', '--format', 'json', self.loop_script]
+        result = self.run_pyftrace(args)
+        events = [json.loads(line) for line in result.stdout.splitlines()]
+
+        self.assertIn({"event": "repeat", "depth": 2, "count": 999}, events)
+        self.assertEqual(6, len(events))
+
+    def test_verbose_builtin_raises(self):
+        """
+        Test that '--verbose' shows a C function that raises.
+        """
+        result = self.run_source("""
+            def size(value):
+                try:
+                    return len(value)
+                except TypeError:
+                    return 0
+
+            size(None)
+        """, ['--verbose'])
+
+        self.assertEqual([
+            "    Called size from line 8",
+            "        Called len from line 4",
+            "        Raised len",
+            "    Returning size-> 0",
+        ], self.trace_lines(result.stdout))
+
+    def test_script_arguments_and_exit_code(self):
+        """
+        Test that the script gets its arguments and decides the exit code.
+        """
+        result = self.run_source("""
+            import sys
+
+            def main(argv):
+                sys.exit(len(argv))
+
+            main(sys.argv)
+        """, script_args=['one', 'two'])
+
+        self.assertEqual(result.returncode, 3)
+        self.assertEqual([
+            "    Called main from line 7",
+            "    Raised main",
+        ], self.trace_lines(result.stdout))
+
+    def test_missing_script(self):
+        """
+        Test the error for a script that does not exist.
+        """
+        result = self.run_pyftrace(['no_such_script.py'])
+
+        self.assertIn("does not exist", result.stdout)
+        self.assertEqual(result.returncode, 1)
+
+    def test_no_target(self):
+        """
+        Test the error for a command line without a script or module.
+        """
+        result = self.run_pyftrace(['--verbose'])
+
+        self.assertIn("a script or -m module is required", result.stderr)
+        self.assertEqual(result.returncode, 2)
+
+    def test_script_and_module(self):
+        """
+        Test the error for a script given together with '-m'.
+        """
+        result = self.run_pyftrace([self.foobar_script, '-m', 'examples.add'])
+
+        self.assertIn("cannot be combined with -m", result.stderr)
+        self.assertEqual(result.returncode, 2)
+
 def has_module(name):
     return importlib.util.find_spec(name) is not None
 
@@ -800,11 +1121,7 @@ class RealWorldExampleTests(PyftraceTestCase):
 
 if __name__ == '__main__':
     runner = unittest.TextTestRunner(verbosity=2)
-    loader = unittest.TestLoader()
-    suite = unittest.TestSuite([
-        loader.loadTestsFromTestCase(PyftraceTests),
-        loader.loadTestsFromTestCase(RealWorldExampleTests),
-    ])
+    suite = unittest.TestLoader().loadTestsFromModule(sys.modules[__name__])
     result = runner.run(suite)
     if not result.wasSuccessful():
         sys.exit(1)
