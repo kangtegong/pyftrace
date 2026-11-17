@@ -37,6 +37,10 @@ def format_text(event):
             return f"Running module: {event['module']}"
         return f"Running script: {event['script']}"
 
+    if kind == "repeat":
+        times = "time" if event["count"] == 1 else "times"
+        return f"{indent}... repeated {event['count']} more {times}"
+
     if kind == "truncated":
         return f"... trace truncated after {event['max_lines']} lines"
 
@@ -51,6 +55,141 @@ def format_json(event):
     Render a trace event as one JSON object per line.
     """
     return json.dumps(event, ensure_ascii=False)
+
+class Frame:
+    """
+    The state the Collapser keeps for one call that has not returned.
+    """
+    __slots__ = ("events", "previous", "count", "expected", "matched")
+
+    def __init__(self, expected=None):
+        # What this call has put out so far; None once it is too long
+        self.events = []
+        # The last finished call made from this one, and its repeat count
+        self.previous = None
+        self.count = 0
+        # While this call still looks like a repeat of its predecessor,
+        # the events of the predecessor and how many of them matched.
+        self.expected = expected
+        self.matched = 0
+
+class Collapser:
+    """
+    Fold a call that repeats the previous call made from the same
+    function, including everything below it, into a single 'repeat'
+    event behind the first occurrence.
+
+    The first occurrence is passed on as it happens.  A call that
+    follows it is held back for as long as it produces the same events;
+    it is dropped and counted if it does so to the end, and passed on
+    from the point where it differs otherwise.
+    """
+    # Calls that put out more events than this are never folded
+    MAX_EVENTS = 100
+
+    def __init__(self, sink):
+        self.sink = sink
+        # frames[0] stands for the top level, frames[n] for depth n
+        self.frames = [Frame()]
+
+    def feed(self, event):
+        kind = event["event"]
+        depth = event.get("depth", 0)
+
+        if kind == "call":
+            self.drop_frames(depth)
+            self.frames.append(Frame(self.frames[-1].previous))
+            self.write(len(self.frames) - 1, event)
+        elif kind in ("return", "raise") and depth < len(self.frames):
+            self.drop_frames(depth + 1)
+            if depth > 0:
+                self.close(event)
+        else:
+            self.write(len(self.frames) - 1, event)
+
+    def finish(self):
+        """
+        Put out what is still held back at the end of the trace.
+        """
+        for level in range(1, len(self.frames)):
+            if self.frames[level].expected is not None:
+                self.diverge(level)
+        for level in reversed(range(len(self.frames))):
+            self.flush_repeat(level)
+
+    def drop_frames(self, count):
+        """
+        Forget calls whose exit was never seen, down to count frames.
+        """
+        while len(self.frames) > count:
+            level = len(self.frames) - 1
+            if self.frames[level].expected is not None:
+                self.diverge(level)
+            self.flush_repeat(level)
+            self.frames.pop()
+            self.frames[-1].previous = None
+
+    def write(self, level, event):
+        """
+        Add an event to the output of the call at the given level and
+        hand it up, unless that call is still being held back.
+        """
+        while level > 0:
+            frame = self.frames[level]
+            if frame.events is not None:
+                frame.events.append(event)
+                if len(frame.events) > self.MAX_EVENTS:
+                    frame.events = None
+            if frame.expected is not None:
+                if (frame.matched < len(frame.expected)
+                        and frame.expected[frame.matched] == event):
+                    frame.matched += 1
+                    return
+                self.diverge(level)
+            level -= 1
+        self.sink(event)
+
+    def diverge(self, level):
+        """
+        The call at this level is not a repeat after all: release the
+        events held back for it.
+        """
+        frame = self.frames[level]
+        parent = self.frames[level - 1]
+        held = frame.expected[:frame.matched]
+        frame.expected = None
+
+        self.flush_repeat(level - 1)
+        parent.previous = None
+        for event in held:
+            self.write(level - 1, event)
+
+    def flush_repeat(self, level):
+        frame = self.frames[level]
+        if frame.count == 0:
+            return
+        event = {"event": "repeat", "depth": level + 1, "count": frame.count}
+        frame.count = 0
+        self.write(level, event)
+
+    def close(self, event):
+        level = len(self.frames) - 1
+        frame = self.frames[level]
+        self.flush_repeat(level)
+        self.write(level, event)
+
+        if (frame.expected is not None
+                and frame.matched != len(frame.expected)):
+            self.diverge(level)
+
+        self.frames.pop()
+        parent = self.frames[-1]
+        if frame.expected is not None:
+            parent.count += 1
+        elif frame.events is not None:
+            parent.previous = tuple(frame.events)
+        else:
+            parent.previous = None
 
 FORMATS = {
     "text": format_text,

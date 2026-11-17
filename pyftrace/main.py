@@ -43,6 +43,7 @@ def main():
     parser.add_argument('-r', '--report', action='store_true', help="Generate a report of function execution times")
     parser.add_argument('-d', '--depth', type=int, help="Limit the tracing output to DEPTH")
     parser.add_argument('-n', '--max-lines', type=int, metavar='LINES', help="Stop printing the trace after LINES lines. The program keeps running")
+    parser.add_argument('-c', '--collapse', action='store_true', help="Print a call that repeats the one before it only once, followed by a repeat count")
     parser.add_argument('-f', '--function', action='append', help="Trace only calls of <function> and its subcalls. Can be repeated")
     parser.add_argument('-e', '--exclude-function', action='append', help="Exclude calls of <function> (and its subcalls) from tracing. Can be repeated")
     parser.add_argument('-F', '--file', action='append', metavar='PATH', help="Trace only functions defined in PATH: a file, a directory or a glob. Can be repeated")
@@ -108,6 +109,7 @@ def main():
                     )
                     tracer.max_depth = tracer_depth
                     tracer.max_lines = args.max_lines
+                    tracer.collapse = args.collapse
                     tracer.file_filter = normalize_patterns(args.file)
                     tracer.file_exclude = normalize_patterns(args.exclude_file)
                     run_target(tracer, module, script_path, target_args)
@@ -128,6 +130,7 @@ def main():
             )
             tracer.max_depth = tracer_depth
             tracer.max_lines = args.max_lines
+            tracer.collapse = args.collapse
             tracer.file_filter = normalize_patterns(args.file)
             tracer.file_exclude = normalize_patterns(args.exclude_file)
             tracer.format = FORMATS[args.format]

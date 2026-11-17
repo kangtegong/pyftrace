@@ -7,7 +7,7 @@ from abc import ABC, abstractmethod
 from .utils import find_import_end_line, find_module_file
 from .utils import format_exception, safe_str
 from .utils import path_matches
-from .output import format_text
+from .output import Collapser, format_text
 
 # Marks a function exit that has no value to show
 NO_VALUE = object()
@@ -33,6 +33,9 @@ class PyftraceBase(ABC):
         self.max_lines = None
         # Turns a trace event into a line of output, see output.py
         self.format = format_text
+        # Fold repeated calls, see Collapser
+        self.collapse = False
+        self.collapser = None
         self.emitted_lines = 0
         self.trace_arguments = trace_arguments
 
@@ -75,6 +78,9 @@ class PyftraceBase(ABC):
         old_sys_argv = sys.argv.copy()
         sys.argv = argv
 
+        if self.collapse:
+            self.collapser = Collapser(self.write_event)
+
         self.tracing_started = False
         self.setup_tracing()
 
@@ -82,6 +88,8 @@ class PyftraceBase(ABC):
             run()
         finally:
             self.tracing_started = False
+            if self.collapser:
+                self.collapser.finish()
             self.cleanup_tracing()
             sys.path = old_sys_path
             sys.argv = old_sys_argv
@@ -181,6 +189,14 @@ class PyftraceBase(ABC):
         self.emit(event)
 
     def emit(self, event):
+        if self.collapser:
+            self.collapser.feed(event)
+        else:
+            self.write_event(event)
+
+    def write_event(self, event):
+        if self.is_truncated():
+            return
         self.emitted_lines += 1
         if self.is_truncated():
             event = {"event": "truncated", "max_lines": self.max_lines}

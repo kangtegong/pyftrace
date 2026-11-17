@@ -24,6 +24,7 @@ class PyftraceTests(unittest.TestCase):
         cls.module_b = os.path.join(cls.project_root, 'examples', 'module_trace', 'module_b.py')
         cls.exception_script = os.path.join(cls.project_root, 'examples', 'exception.py')
         cls.recursive_script = os.path.join(cls.project_root, 'examples', 'recursives.py')
+        cls.loop_script = os.path.join(cls.project_root, 'examples', 'loop.py')
         cls.add_script = os.path.join(cls.project_root, 'examples', 'add.py')
         cls.temp_output = os.path.join(cls.project_root, 'tests', 'tmp_output.txt')
 
@@ -433,6 +434,26 @@ Results: ret_a, ret_b
         ]
 
         self.assertEqual(expected_events, events)
+        self.assertEqual(result.returncode, 0)
+
+    def test_collapse(self):
+        """
+        Test '--collapse' flag for folding repeated calls.
+        """
+        args = ['--collapse', self.loop_script]
+        result = self.run_pyftrace(args)
+
+        expected_output = f"""Running script: {self.loop_script}
+    Called run from line 8
+        Called tick from line 6
+        Returning tick-> tock
+        ... repeated 999 more times
+    Returning run-> None"""
+
+        normalized_expected = self.normalize_output(expected_output)
+        normalized_actual = self.normalize_output(result.stdout)
+
+        self.assertEqual(normalized_expected, normalized_actual)
         self.assertEqual(result.returncode, 0)
 
     # def test_tracing_script_path(self):
