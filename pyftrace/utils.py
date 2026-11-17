@@ -32,6 +32,16 @@ def resolve_filename(code, callable_obj):
                 filename = module.__file__
     return filename
 
+# Set in the code of a function, but not in that of a module or class body
+CO_OPTIMIZED = 0x01
+
+def is_function_code(code):
+    """
+    False for code that runs because of a definition or an import
+    rather than a call: the body of a class or of a module.
+    """
+    return bool(code.co_flags & CO_OPTIMIZED)
+
 def callable_name(callable_obj):
     """
     Name a traced callable without calling into user code: str() and

@@ -5,7 +5,7 @@ import sysconfig
 import threading
 from ..tracer import PyftraceBase
 from ..utils import resolve_filename, format_arguments, callable_name
-from ..utils import is_unwinding
+from ..utils import is_unwinding, is_function_code
 
 class PyftraceSetprofile(PyftraceBase):
     """
@@ -85,7 +85,8 @@ class PyftraceSetprofile(PyftraceBase):
                 return
             self.tracing_started = True
 
-        if func_name == '<module>':
+        # Module and class bodies are not traced
+        if code and not is_function_code(code):
             return
 
         trace_this = False
@@ -181,6 +182,9 @@ class PyftraceSetprofile(PyftraceBase):
                 # The program is over for this thread.  What it runs from
                 # here on is the machinery that started the program.
                 self.thread_state.muted = True
+            return
+
+        if code and not is_function_code(code):
             return
 
         if self.exclude_depth > 0:

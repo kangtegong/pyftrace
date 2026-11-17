@@ -5,7 +5,7 @@ import weakref
 import sysconfig
 from ..tracer import PyftraceBase
 from ..utils import resolve_filename, get_line_number, callable_name
-from ..utils import format_arguments
+from ..utils import format_arguments, is_function_code
 
 class PyftraceMonitoring(PyftraceBase):
     """
@@ -80,7 +80,7 @@ class PyftraceMonitoring(PyftraceBase):
                 self.tracing_started = True
             return
 
-        if func_name == '<module>' or self.is_tracer_code(def_filename):
+        if not is_function_code(code) or self.is_tracer_code(def_filename):
             return
 
         caller = frame.f_back
@@ -183,8 +183,8 @@ class PyftraceMonitoring(PyftraceBase):
             filename = os.path.abspath(filename)
         func_name = code.co_name if code else "<unknown>"
 
-        # Skip tracing the '<module>' function's return event
-        if func_name == '<module>':
+        # Module and class bodies are not traced
+        if not code or not is_function_code(code):
             return
 
         if self.exclude_depth > 0:
