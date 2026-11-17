@@ -27,17 +27,18 @@ class PyftraceMonitoring(PyftraceBase):
         sys.monitoring.register_callback(self.tool_id, sys.monitoring.events.C_RETURN, self.monitor_c_return)
         sys.monitoring.register_callback(self.tool_id, sys.monitoring.events.PY_UNWIND, self.monitor_py_unwind)
         sys.monitoring.register_callback(self.tool_id, sys.monitoring.events.C_RAISE, self.monitor_c_raise)
-        sys.monitoring.set_events(
-            self.tool_id,
-            sys.monitoring.events.PY_START |
-            sys.monitoring.events.PY_RESUME |
-            sys.monitoring.events.PY_YIELD |
-            sys.monitoring.events.CALL |
-            sys.monitoring.events.PY_RETURN |
-            sys.monitoring.events.PY_UNWIND |
-            sys.monitoring.events.C_RETURN |
-            sys.monitoring.events.C_RAISE
-        )
+        events = (sys.monitoring.events.PY_START |
+                  sys.monitoring.events.PY_RESUME |
+                  sys.monitoring.events.PY_YIELD |
+                  sys.monitoring.events.PY_RETURN |
+                  sys.monitoring.events.PY_UNWIND)
+        if self.verbose or self.function_exclude:
+            # C functions are shown with --verbose only, but -e can name
+            # one to hide the Python functions it calls back
+            events |= (sys.monitoring.events.CALL |
+                       sys.monitoring.events.C_RETURN |
+                       sys.monitoring.events.C_RAISE)
+        sys.monitoring.set_events(self.tool_id, events)
 
     def cleanup_tracing(self):
         sys.monitoring.free_tool_id(self.tool_id)
