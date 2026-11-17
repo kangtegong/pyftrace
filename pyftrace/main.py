@@ -46,7 +46,7 @@ def main():
     parser.add_argument('-c', '--collapse', action='store_true', help="Print a call that repeats the one before it only once, followed by a repeat count")
     parser.add_argument('-f', '--function', action='append', help="Trace only calls of <function> and its subcalls. Can be repeated")
     parser.add_argument('-e', '--exclude-function', action='append', help="Exclude calls of <function> (and its subcalls) from tracing. Can be repeated")
-    parser.add_argument('-F', '--file', action='append', metavar='PATH', help="Trace only functions defined in PATH: a file, a directory or a glob. Can be repeated")
+    parser.add_argument('-F', '--file', action='append', metavar='PATH', help="Trace only functions defined in PATH: a file, a directory, a glob or a module name. Can be repeated")
     parser.add_argument('-E', '--exclude-file', action='append', metavar='PATH', help="Do not trace functions defined in PATH. Can be repeated")
     parser.add_argument('-a', '--argument', action='store_true', help="Show function arguments in tracing output (Python frames only)")
     parser.add_argument('--format', choices=sorted(FORMATS), default='text', help="Output format: 'text' (default) or 'json', one JSON object per line")
@@ -80,6 +80,11 @@ def main():
         if not os.path.isfile(script_path):
             print(f"Error: Script '{script_path}' does not exist.")
             sys.exit(1)
+
+    # Where the program will find its modules, for -F and -E
+    search_dir = os.getcwd()
+    if script_path:
+        search_dir = os.path.dirname(os.path.abspath(script_path))
 
     tracer_depth = args.depth if args.depth is not None else None
     func_filter = args.function 
@@ -115,8 +120,8 @@ def main():
                     tracer.max_depth = tracer_depth
                     tracer.max_lines = args.max_lines
                     tracer.collapse = args.collapse
-                    tracer.file_filter = normalize_patterns(args.file)
-                    tracer.file_exclude = normalize_patterns(args.exclude_file)
+                    tracer.file_filter = normalize_patterns(args.file, search_dir)
+                    tracer.file_exclude = normalize_patterns(args.exclude_file, search_dir)
                     run_target(tracer, module, script_path, target_args)
                 run_tui(temp_file_path)
 
@@ -137,8 +142,8 @@ def main():
             tracer.max_depth = tracer_depth
             tracer.max_lines = args.max_lines
             tracer.collapse = args.collapse
-            tracer.file_filter = normalize_patterns(args.file)
-            tracer.file_exclude = normalize_patterns(args.exclude_file)
+            tracer.file_filter = normalize_patterns(args.file, search_dir)
+            tracer.file_exclude = normalize_patterns(args.exclude_file, search_dir)
             tracer.format = FORMATS[args.format]
             run_target(tracer, module, script_path, target_args)
 

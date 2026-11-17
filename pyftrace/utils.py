@@ -124,11 +124,42 @@ def find_import_end_line(script_path):
         return 0
 
 
-def normalize_patterns(patterns):
+def module_paths(name):
     """
-    Prepare the paths given with -F and -E for path_matches().
+    Return the file of a module or the directories of a package, or
+    nothing if name is not the name of an importable module.
     """
-    return tuple(os.path.normcase(os.path.abspath(p)) for p in patterns or ())
+    if not all(part.isidentifier() for part in name.split('.')):
+        return []
+    try:
+        spec = importlib.util.find_spec(name)
+    except (ImportError, ValueError):
+        return []
+    if spec is None:
+        return []
+    if spec.submodule_search_locations is not None:
+        return list(spec.submodule_search_locations)
+    return [spec.origin] if spec.has_location else []
+
+def normalize_patterns(patterns, search_dir=None):
+    """
+    Prepare what was given with -F and -E for path_matches().  An entry
+    that is not an existing path is tried as a module name, looked up
+    in search_dir first and then like an import.
+    """
+    paths = []
+    if search_dir is not None:
+        sys.path.insert(0, search_dir)
+    try:
+        for pattern in patterns or ():
+            if os.path.exists(pattern):
+                paths.append(pattern)
+            else:
+                paths.extend(module_paths(pattern) or [pattern])
+    finally:
+        if search_dir is not None:
+            sys.path.remove(search_dir)
+    return tuple(os.path.normcase(os.path.abspath(path)) for path in paths)
 
 def path_matches(path, patterns):
     """

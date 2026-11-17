@@ -399,6 +399,26 @@ Results: ret_a, ret_b"""
         self.assertEqual(normalized_expected, normalized_actual)
         self.assertEqual(result.returncode, 0)
 
+    def test_file_filter_module_name(self):
+        """
+        Test '--file' flag with a module name instead of a path.
+        """
+        args = ['--file', 'module_a', self.main_script]
+        result = self.run_pyftrace(args)
+
+        expected_output = f"""Running script: {self.main_script}
+    Called function_a from line 5
+Function A is called.
+    Returning function_a-> ret_a
+Function B is called.
+Results: ret_a, ret_b"""
+
+        normalized_expected = self.normalize_output(expected_output)
+        normalized_actual = self.normalize_output(result.stdout)
+
+        self.assertEqual(normalized_expected, normalized_actual)
+        self.assertEqual(result.returncode, 0)
+
     def test_exclude_file(self):
         """
         Test '--exclude-file' flag with a glob pattern.

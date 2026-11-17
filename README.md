@@ -100,7 +100,7 @@ $ pip install pyftrace
 - `--collapse` or `-c`: Print a call that is identical to the previous one, including everything it calls, only once, followed by `... repeated N more times`. Useful for loops.
 - `--function` or `-f`: Filter the names of function to be traced. Can be given more than once.
 - `--exclude-function` or `-e`: Exclude the specified function from the trace. Can be given more than once.
-- `--file` or `-F <path>`: Trace only functions defined in the given file, directory or glob pattern, e.g. `-F src/mypkg`. Can be given more than once.
+- `--file` or `-F <path>`: Trace only functions defined in the given file, directory or glob pattern, or in a module or package given by name, e.g. `-F src/mypkg` or `-F mypkg.core`. Can be given more than once.
 - `--exclude-file` or `-E <path>`: Do not trace functions defined in the given file, directory or glob pattern. Can be given more than once.
 
 ## TUI
