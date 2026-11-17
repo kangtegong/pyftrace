@@ -7,6 +7,7 @@ from abc import ABC, abstractmethod
 from .utils import find_import_end_line, find_module_file
 from .utils import format_exception, safe_str
 from .utils import path_matches
+from .output import format_text
 
 # Marks a function exit that has no value to show
 NO_VALUE = object()
@@ -30,6 +31,8 @@ class PyftraceBase(ABC):
         self.import_end_line = 0
         self.max_depth = None
         self.max_lines = None
+        # Turns a trace event into a line of output, see output.py
+        self.format = format_text
         self.emitted_lines = 0
         self.trace_arguments = trace_arguments
 
@@ -84,8 +87,7 @@ class PyftraceBase(ABC):
             sys.argv = old_sys_argv
 
     def run_python_script(self, script_path, script_args):
-        if self.output_stream:
-            print(f"Running script: {script_path}", file=self.output_stream)
+        self.emit_start({"event": "start", "script": script_path})
 
         with open(script_path, "r") as file:
             code_object = compile(file.read(), script_path, 'exec')
@@ -102,23 +104,30 @@ class PyftraceBase(ABC):
         if module_path is None:
             raise ImportError(f"No module named {module_name}")
 
-        if self.output_stream:
-            print(f"Running module: {module_name}", file=self.output_stream)
+        self.emit_start({"event": "start", "module": module_name})
 
         def run():
             runpy.run_module(module_name, run_name="__main__", alter_sys=True)
 
         self.run_traced(module_path, [module_path] + module_args, run)
 
+    def emit_start(self, event):
+        # The header is not part of the trace: --max-lines does not count it
+        if self.output_stream:
+            print(self.format(event), file=self.output_stream)
+
     def print_report(self, stream=None):
         stream = stream or self.output_stream or sys.stdout
-        print("\nFunction Name\t| Total Execution Time\t| Call Count", file=stream)
-        print("---------------------------------------------------------", file=stream)
+        if self.format is format_text:
+            print("\nFunction Name\t| Total Execution Time\t| Call Count", file=stream)
+            print("---------------------------------------------------------", file=stream)
         sorted_report = sorted(
             self.execution_report.items(), key=lambda item: item[1][1], reverse=True
         )
         for func_name, (_, total_time, call_count) in sorted_report:
-            print(f"{func_name:<15}\t| {total_time:.6f} seconds\t| {call_count}", file=stream)
+            event = {"event": "report", "function": func_name,
+                     "seconds": total_time, "calls": call_count}
+            print(self.format(event), file=stream)
 
     def current_depth(self):
         return len(self.call_stack)
@@ -142,42 +151,40 @@ class PyftraceBase(ABC):
         if not self.should_emit():
             return
 
-        indent = "    " * self.current_depth()
-        function = func_name
-        caller = f"from line {call_line}"
+        event = {"event": "call", "depth": self.current_depth(),
+                 "function": func_name, "line": call_line}
         if self.show_path and def_location:
-            function = f"{func_name}@{def_location}"
+            event["defined_at"] = def_location
         if self.show_path and call_file and call_line:
-            caller = f"from {call_file}:{call_line}"
+            event["caller_file"] = call_file
         if arguments:
-            function = f"{function} ({arguments})"
+            event["args"] = arguments
 
-        self.emit(f"{indent}Called {function} {caller}")
+        self.emit(event)
 
     def emit_exit(self, func_name, file_name, value=NO_VALUE, exception=None,
                   raised=False):
         if not self.should_emit():
             return
 
-        indent = "    " * self.current_depth()
+        event = {"event": "return", "depth": self.current_depth(),
+                 "function": func_name}
+        if exception is not None or raised:
+            event["event"] = "raise"
         if exception is not None:
-            text = f"Raised {func_name}-> {format_exception(exception)}"
-        elif raised:
-            text = f"Raised {func_name}"
-        elif value is NO_VALUE:
-            text = f"Returning {func_name}"
-        else:
-            text = f"Returning {func_name}-> {safe_str(value)}"
+            event["exception"] = format_exception(exception)
+        elif not raised and value is not NO_VALUE:
+            event["value"] = safe_str(value)
         if self.show_path and file_name:
-            text = f"{text} @ {file_name}"
+            event["file"] = file_name
 
-        self.emit(f"{indent}{text}")
+        self.emit(event)
 
-    def emit(self, line):
+    def emit(self, event):
         self.emitted_lines += 1
         if self.is_truncated():
-            line = f"... trace truncated after {self.max_lines} lines"
-        print(line, file=self.output_stream)
+            event = {"event": "truncated", "max_lines": self.max_lines}
+        print(self.format(event), file=self.output_stream)
 
     def should_trace(self, file_name):
         if not file_name:

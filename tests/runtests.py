@@ -3,6 +3,7 @@ import subprocess
 import sys
 import os
 import re
+import json
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
@@ -411,6 +412,27 @@ Results: ret_a, ret_b
         normalized_actual = self.normalize_output(result.stdout)
 
         self.assertEqual(normalized_expected, normalized_actual)
+        self.assertEqual(result.returncode, 0)
+
+    def test_format_json(self):
+        """
+        Test '--format json' for machine-readable output.
+        """
+        args = ['--format', 'json', self.foobar_script]
+        result = self.run_pyftrace(args)
+
+        events = [json.loads(line) for line in result.stdout.splitlines()]
+        expected_events = [
+            {"event": "start", "script": self.foobar_script},
+            {"event": "call", "depth": 1, "function": "foo", "line": 9},
+            {"event": "call", "depth": 2, "function": "bar", "line": 2},
+            {"event": "return", "depth": 2, "function": "bar", "value": "6"},
+            {"event": "call", "depth": 2, "function": "bar", "line": 3},
+            {"event": "return", "depth": 2, "function": "bar", "value": "14"},
+            {"event": "return", "depth": 1, "function": "foo", "value": "10"},
+        ]
+
+        self.assertEqual(expected_events, events)
         self.assertEqual(result.returncode, 0)
 
     # def test_tracing_script_path(self):

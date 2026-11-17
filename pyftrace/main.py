@@ -2,6 +2,7 @@ import sys
 import argparse
 from .tracer import get_tracer
 from .utils import find_module_file, normalize_patterns
+from .output import FORMATS
 from .tui import run_tui
 from . import __version__
 import tempfile
@@ -47,6 +48,7 @@ def main():
     parser.add_argument('-F', '--file', action='append', metavar='PATH', help="Trace only functions defined in PATH: a file, a directory or a glob. Can be repeated")
     parser.add_argument('-E', '--exclude-file', action='append', metavar='PATH', help="Do not trace functions defined in PATH. Can be repeated")
     parser.add_argument('-a', '--argument', action='store_true', help="Show function arguments in tracing output (Python frames only)")
+    parser.add_argument('--format', choices=sorted(FORMATS), default='text', help="Output format: 'text' (default) or 'json', one JSON object per line")
     parser.add_argument('-o', '--output', help="Write tracing output to a file. The traced program's own output is not redirected")
 
     parser.add_argument('-m', dest='module', metavar='MODULE', help="Run and trace a library module as a script, like 'python -m'.\nEverything after MODULE is passed to the module.")
@@ -128,6 +130,7 @@ def main():
             tracer.max_lines = args.max_lines
             tracer.file_filter = normalize_patterns(args.file)
             tracer.file_exclude = normalize_patterns(args.exclude_file)
+            tracer.format = FORMATS[args.format]
             run_target(tracer, module, script_path, target_args)
 
             if args.report:
