@@ -5,6 +5,7 @@ on: push
 jobs:
   test:
     strategy:
+      fail-fast: false
       matrix:
         # The last image that has Python 3.8 and 3.9
         os: [ubuntu-24.04]
