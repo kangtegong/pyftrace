@@ -25,6 +25,7 @@ class PyftraceTests(unittest.TestCase):
         cls.exception_script = os.path.join(cls.project_root, 'examples', 'exception.py')
         cls.recursive_script = os.path.join(cls.project_root, 'examples', 'recursives.py')
         cls.loop_script = os.path.join(cls.project_root, 'examples', 'loop.py')
+        cls.threads_script = os.path.join(cls.project_root, 'examples', 'threads.py')
         cls.add_script = os.path.join(cls.project_root, 'examples', 'add.py')
         cls.temp_output = os.path.join(cls.project_root, 'tests', 'tmp_output.txt')
 
@@ -452,6 +453,32 @@ Results: ret_a, ret_b
 
         normalized_expected = self.normalize_output(expected_output)
         normalized_actual = self.normalize_output(result.stdout)
+
+        self.assertEqual(normalized_expected, normalized_actual)
+        self.assertEqual(result.returncode, 0)
+
+    def test_threads(self):
+        """
+        Test that a thread is traced on its own call stack.
+        """
+        result = self.run_pyftrace([self.threads_script])
+
+        expected_output = f"""Running script: {self.threads_script}
+    Called main from line 15
+[tid N]     Called worker from line N
+[tid N]         Called square from line 7
+[tid N]         Returning square-> 9
+[tid N]     Returning worker-> 9
+        Called square from line 13
+        Returning square-> 16
+    Returning main-> 16"""
+
+        # The thread id and the line in threading.py that calls worker vary
+        actual = re.sub(r"\[tid \d+\]", "[tid N]", result.stdout)
+        actual = re.sub(r"(Called worker from line) \d+", r"\1 N", actual)
+
+        normalized_expected = self.normalize_output(expected_output)
+        normalized_actual = self.normalize_output(actual)
 
         self.assertEqual(normalized_expected, normalized_actual)
         self.assertEqual(result.returncode, 0)

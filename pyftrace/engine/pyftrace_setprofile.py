@@ -2,6 +2,7 @@ import sys
 import os
 import time
 import sysconfig
+import threading
 from ..tracer import PyftraceBase
 from ..utils import resolve_filename, format_arguments, callable_name
 from ..utils import is_unwinding
@@ -15,12 +16,20 @@ class PyftraceSetprofile(PyftraceBase):
         super().__init__(verbose, show_path, report_mode, output_stream, function_filter, function_exclude, trace_arguments)
 
     def setup_tracing(self):
+        # sys.setprofile() is per thread: hook the threads started later too
+        self.stopped = False
+        threading.setprofile(self.profile_func)
         sys.setprofile(self.profile_func)
 
     def cleanup_tracing(self):
         sys.setprofile(None)
+        threading.setprofile(None)
+        # Threads that are still running keep their hook
+        self.stopped = True
 
     def profile_func(self, frame, event, arg):
+        if self.stopped:
+            return
         if event == "call":
             self.handle_call_event(frame, arg, is_c_call=False)
         elif event == "return":
