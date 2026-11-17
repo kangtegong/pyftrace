@@ -6,6 +6,7 @@ import re
 import json
 import importlib.util
 import random
+import select
 import shutil
 import sysconfig
 import tempfile
@@ -1275,6 +1276,78 @@ class LibraryCodeTests(unittest.TestCase):
         self.tracer.file_exclude = (os.path.join(examples, '*', 'module_a.py'),)
         self.assertTrue(self.tracer.file_selected(script))
         self.assertFalse(self.tracer.file_selected(other))
+
+try:
+    import curses
+    import pty
+except ImportError:
+    pty = None
+
+@unittest.skipUnless(pty, "needs a pseudo-terminal and curses")
+class TuiTests(PyftraceTestCase):
+    """
+    The TUI, driven through a pseudo-terminal.
+    """
+
+    def run_tui(self, args, wait_for):
+        """
+        Start 'pyftrace tui', wait until the screen shows wait_for, quit
+        with 'q' and return what was drawn and the exit status.
+        """
+        command = [self.python_executable, '-m', self.pyftrace_module] + args
+        pid, fd = pty.fork()
+        if pid == 0:
+            os.chdir(self.project_root)
+            os.environ.update(TERM="xterm", LINES="40", COLUMNS="160",
+                              PYTHONPATH=self.project_root)
+            os.execv(command[0], command)
+
+        drawn = b""
+        quit_sent = False
+        deadline = time.time() + 30
+        while time.time() < deadline:
+            ready, _, _ = select.select([fd], [], [], 0.2)
+            if ready:
+                try:
+                    data = os.read(fd, 65536)
+                except OSError:
+                    data = b""
+                if not data:
+                    break       # the terminal is gone: the TUI has exited
+                drawn += data
+            if not quit_sent and wait_for.encode() in drawn:
+                os.write(fd, b"q")
+                quit_sent = True
+        _, status = os.waitpid(pid, 0)
+        os.close(fd)
+        # Take the cursor movements out of what is left on the screen
+        text = re.sub(rb"\x1b\[[0-9;?]*[a-zA-Z]|\x1b[()][A-Z0-9]|\x1b[=>]",
+                      b"\n", drawn).decode("utf-8", "replace")
+        return [line.strip() for line in text.splitlines()], status
+
+    def test_tui(self):
+        """
+        Test that the TUI shows the trace in its short form and quits.
+        """
+        lines, status = self.run_tui(['tui', self.foobar_script],
+                                     "Returning foo")
+
+        self.assertEqual(0, status)
+        for expected in ("Called foo", "Called bar", "Returning bar",
+                         "Returning foo"):
+            self.assertIn(expected, lines)
+
+    def test_tui_raised(self):
+        """
+        Test that the TUI shortens a 'Raised' line like the others.
+        """
+        lines, status = self.run_tui(['--path', 'tui', self.exception_script],
+                                     "Raised load")
+
+        self.assertEqual(0, status)
+        # Without the exception and the path, which belong in the detail pane
+        self.assertIn("Raised parse", lines)
+        self.assertIn("Raised load", lines)
 
 class ConcurrencyTests(PyftraceTestCase):
     """
