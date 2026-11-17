@@ -20,7 +20,7 @@ class ThreadState:
     What the tracer has to know about each thread on its own.
     """
     __slots__ = ("call_stack", "filter_depth", "exclude_depth", "collapser",
-                 "tid", "muted")
+                 "tid", "muted", "start_times", "active_calls")
 
     def __init__(self):
         self.call_stack = []
@@ -31,6 +31,10 @@ class ThreadState:
         self.tid = None
         # Set once the thread has nothing more of the program to run
         self.muted = False
+        # For --report: when each call on the stack started, and how many
+        # calls of each function are on it
+        self.start_times = []
+        self.active_calls = {}
 
 class PyftraceBase(ABC):
     """
@@ -288,19 +292,23 @@ class PyftraceBase(ABC):
     def report_call(self, func_name):
         if not self.report_mode:
             return
-        start_time = time.time()
-        if func_name in self.execution_report:
-            _, total_time, call_count = self.execution_report[func_name]
-            self.execution_report[func_name] = (start_time, total_time, call_count + 1)
-        else:
-            self.execution_report[func_name] = (start_time, 0, 1)
+        state = self.thread_state
+        state.start_times.append(time.time())
+        state.active_calls[func_name] = state.active_calls.get(func_name, 0) + 1
 
     def report_return(self, func_name):
-        if not self.report_mode or func_name not in self.execution_report:
+        state = self.thread_state
+        if not self.report_mode or not state.start_times:
             return
-        start_time, total_time, call_count = self.execution_report[func_name]
-        exec_time = time.time() - start_time
-        self.execution_report[func_name] = (start_time, total_time + exec_time, call_count)
+        exec_time = time.time() - state.start_times.pop()
+        state.active_calls[func_name] -= 1
+        # A recursive call runs within the time of the outermost one
+        if state.active_calls[func_name] > 0:
+            exec_time = 0
+
+        with self.output_lock:
+            total_time, call_count = self.execution_report.get(func_name, (0, 0))
+            self.execution_report[func_name] = (total_time + exec_time, call_count + 1)
 
     def print_report(self, stream=None):
         stream = stream or self.output_stream or sys.stdout
@@ -308,9 +316,9 @@ class PyftraceBase(ABC):
             print("\nFunction Name\t| Total Execution Time\t| Call Count", file=stream)
             print("---------------------------------------------------------", file=stream)
         sorted_report = sorted(
-            self.execution_report.items(), key=lambda item: item[1][1], reverse=True
+            self.execution_report.items(), key=lambda item: item[1][0], reverse=True
         )
-        for func_name, (_, total_time, call_count) in sorted_report:
+        for func_name, (total_time, call_count) in sorted_report:
             event = {"event": "report", "function": func_name,
                      "seconds": total_time, "calls": call_count}
             print(self.format(event), file=stream)
