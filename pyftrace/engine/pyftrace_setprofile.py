@@ -28,7 +28,7 @@ class PyftraceSetprofile(PyftraceBase):
         self.stopped = True
 
     def profile_func(self, frame, event, arg):
-        if self.stopped:
+        if self.stopped or self.thread_state.muted:
             return
         if event == "call":
             self.handle_call_event(frame, arg, is_c_call=False)
@@ -176,6 +176,11 @@ class PyftraceSetprofile(PyftraceBase):
             return
 
         if func_name == '<module>':
+            if (filename == self.script_name
+                    and frame.f_globals.get('__name__') == '__main__'):
+                # The program is over for this thread.  What it runs from
+                # here on is the machinery that started the program.
+                self.thread_state.muted = True
             return
 
         if self.exclude_depth > 0:

@@ -18,7 +18,7 @@ class ThreadState:
     What the tracer has to know about each thread on its own.
     """
     __slots__ = ("call_stack", "filter_depth", "exclude_depth", "collapser",
-                 "tid")
+                 "tid", "muted")
 
     def __init__(self):
         self.call_stack = []
@@ -27,6 +27,8 @@ class ThreadState:
         self.collapser = None
         # Shown with every event of the thread; None for the main thread
         self.tid = None
+        # Set once the thread has nothing more of the program to run
+        self.muted = False
 
 class PyftraceBase(ABC):
     """
