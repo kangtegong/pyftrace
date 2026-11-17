@@ -172,13 +172,11 @@ class PyftraceBase(ABC):
     def run_python_script(self, script_path, script_args):
         self.emit_start({"event": "start", "script": script_path})
 
-        with open(script_path, "r") as file:
-            code_object = compile(file.read(), script_path, 'exec')
-        script_globals = {"__file__": script_path, "__name__": "__main__"}
-
+        # Run the script as the real __main__ module, like python does:
+        # pickle, and with it multiprocessing, looks its functions up there.
         def run():
             sys.path.insert(0, self.script_dir)
-            exec(code_object, script_globals)
+            runpy.run_path(script_path, run_name="__main__")
 
         self.run_traced(script_path, [script_path] + script_args, run)
 
