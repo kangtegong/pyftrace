@@ -47,9 +47,22 @@ def safe_str(value):
     str() that cannot fail: __str__ of a traced object is user code.
     """
     try:
-        return str(value)
+        return shorten(str(value))
     except Exception:
         return f"<unprintable {type(value).__name__}>"
+
+# A value is cut off beyond this many characters
+MAX_VALUE_LENGTH = 200
+
+def shorten(text):
+    """
+    Fit a value into a line of trace: on a single line and not
+    arbitrarily long.
+    """
+    text = " ".join(text.split())
+    if len(text) > MAX_VALUE_LENGTH:
+        text = text[:MAX_VALUE_LENGTH] + "..."
+    return text
 
 def format_exception(exception):
     """
@@ -178,7 +191,7 @@ def format_arguments(frame) -> str:
 
     def safe_repr(value):
         try:
-            return repr(value)
+            return shorten(repr(value))
         except Exception:
             return f"<unreprable {type(value).__name__}>"
 
