@@ -7,6 +7,7 @@ import json
 import importlib.util
 import random
 import shutil
+import sysconfig
 import tempfile
 import textwrap
 import time
@@ -15,6 +16,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 
 from pyftrace import __version__ as pyftrace_version
 from pyftrace.output import Collapser
+from pyftrace.tracer import get_tracer
 
 class PyftraceTestCase(unittest.TestCase):
     @classmethod
@@ -1215,6 +1217,64 @@ class RegressionTests(PyftraceTestCase):
         self.assertEqual(["    Called crash from line 7"],
                          self.trace_lines(result.stdout))
         self.assertEqual(result.returncode, 7)
+
+class LibraryCodeTests(unittest.TestCase):
+    """
+    Which files count as the program's own code.
+    """
+
+    def setUp(self):
+        self.tracer = get_tracer()
+        self.verbose_tracer = get_tracer(verbose=True)
+        self.project_root = os.path.abspath(
+            os.path.join(os.path.dirname(__file__), '..'))
+
+    def test_user_code(self):
+        script = os.path.join(self.project_root, 'examples', 'foobar.py')
+        self.assertTrue(self.tracer.should_trace(script))
+
+    def test_standard_library(self):
+        self.assertFalse(self.tracer.should_trace(os.__file__))
+        self.assertFalse(self.verbose_tracer.should_trace(os.__file__))
+        # The same file reached through a resolved path
+        self.assertFalse(self.tracer.should_trace(os.path.realpath(os.__file__)))
+
+    def test_site_packages(self):
+        module = os.path.join(sysconfig.get_paths()["purelib"],
+                              "somepackage", "module.py")
+        self.assertFalse(self.tracer.should_trace(module))
+        # Third-party code is what --verbose adds
+        self.assertTrue(self.verbose_tracer.should_trace(module))
+
+    def test_sibling_of_library_directory(self):
+        # A directory is not library code for sharing a prefix with one
+        stdlib = sysconfig.get_paths()["stdlib"]
+        self.assertFalse(self.tracer.is_stdlib_code(stdlib + "-mine/module.py"))
+
+    def test_code_without_source_file(self):
+        for name in ("<string>", "<frozen posixpath>",
+                     os.path.abspath("<string>")):
+            self.assertFalse(self.tracer.should_trace(name), name)
+        self.assertTrue(self.tracer.is_stdlib_code("<frozen posixpath>"))
+
+    def test_tracer_code(self):
+        import pyftrace.tracer
+        self.assertFalse(self.tracer.should_trace(pyftrace.tracer.__file__))
+        self.assertFalse(self.verbose_tracer.should_trace(pyftrace.tracer.__file__))
+
+    def test_file_filters(self):
+        examples = os.path.join(self.project_root, 'examples')
+        script = os.path.join(examples, 'foobar.py')
+        other = os.path.join(examples, 'module_trace', 'module_a.py')
+
+        self.assertTrue(self.tracer.file_selected(script))
+        self.tracer.file_filter = (os.path.join(examples, 'module_trace'),)
+        self.assertFalse(self.tracer.file_selected(script))
+        self.assertTrue(self.tracer.file_selected(other))
+        self.tracer.file_filter = ()
+        self.tracer.file_exclude = (os.path.join(examples, '*', 'module_a.py'),)
+        self.assertTrue(self.tracer.file_selected(script))
+        self.assertFalse(self.tracer.file_selected(other))
 
 class ConcurrencyTests(PyftraceTestCase):
     """
