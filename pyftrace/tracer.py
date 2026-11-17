@@ -26,7 +26,9 @@ class PyftraceBase(ABC):
         self.trace_arguments = trace_arguments
 
         # Get the standard library directory
-        self.stdlib_dir = os.path.abspath(sysconfig.get_paths()["stdlib"])
+        paths = sysconfig.get_paths()
+        self.stdlib_dirs = self.normalize_dirs(
+            [paths["stdlib"], paths["platstdlib"]])
         self.site_dirs = self.find_site_dirs()
 
         self.function_filter = function_filter
@@ -132,7 +134,19 @@ class PyftraceBase(ABC):
             dirs += site.getsitepackages()
         if hasattr(site, "getusersitepackages"):
             dirs.append(site.getusersitepackages())
-        return tuple({os.path.normcase(os.path.abspath(d)) for d in dirs})
+        return PyftraceBase.normalize_dirs(dirs)
+
+    @staticmethod
+    def normalize_dirs(dirs):
+        """
+        Return dirs as a tuple for str.startswith().  Code objects may
+        record the symlinked or the resolved path, so keep both.
+        """
+        result = set()
+        for d in dirs:
+            result.add(os.path.normcase(os.path.abspath(d)))
+            result.add(os.path.normcase(os.path.realpath(d)))
+        return tuple(os.path.join(d, '') for d in result)
 
     def is_site_code(self, file_name):
         if not file_name:
@@ -146,8 +160,7 @@ class PyftraceBase(ABC):
         if os.path.basename(file_name).startswith('<frozen'):
             return True  # Exclude frozen modules
         abs_file_name = os.path.normcase(os.path.abspath(file_name))
-        stdlib_dir_norm = os.path.normcase(self.stdlib_dir)
-        return abs_file_name.startswith(stdlib_dir_norm)
+        return abs_file_name.startswith(self.stdlib_dirs)
 
 # Import engine modules AFTER defining PyftraceBase (avoid circular imports)
 from .engine.pyftrace_monitoring import PyftraceMonitoring
