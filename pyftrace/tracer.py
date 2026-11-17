@@ -1,5 +1,6 @@
 import sys
 import os
+import site
 import sysconfig
 from abc import ABC, abstractmethod
 from .utils import resolve_filename, get_line_number
@@ -26,6 +27,7 @@ class PyftraceBase(ABC):
 
         # Get the standard library directory
         self.stdlib_dir = os.path.abspath(sysconfig.get_paths()["stdlib"])
+        self.site_dirs = self.find_site_dirs()
 
         self.function_filter = function_filter
         self.filter_depth = 0
@@ -65,6 +67,8 @@ class PyftraceBase(ABC):
             return False
         if self.is_stdlib_code(abs_file_name):
             return False
+        if not self.verbose and self.is_site_code(abs_file_name):
+            return False
         return True
 
     def is_tracer_code(self, file_name):
@@ -72,6 +76,22 @@ class PyftraceBase(ABC):
             return False
         abs_file_name = os.path.abspath(file_name)
         return abs_file_name.startswith(self.tracer_dir)
+
+    @staticmethod
+    def find_site_dirs():
+        paths = sysconfig.get_paths()
+        dirs = [paths["purelib"], paths["platlib"]]
+        if hasattr(site, "getsitepackages"):
+            dirs += site.getsitepackages()
+        if hasattr(site, "getusersitepackages"):
+            dirs.append(site.getusersitepackages())
+        return tuple({os.path.normcase(os.path.abspath(d)) for d in dirs})
+
+    def is_site_code(self, file_name):
+        if not file_name:
+            return False
+        abs_file_name = os.path.normcase(os.path.abspath(file_name))
+        return abs_file_name.startswith(self.site_dirs)
 
     def is_stdlib_code(self, file_name):
         if not file_name:
