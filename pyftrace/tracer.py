@@ -1,8 +1,10 @@
 import sys
 import os
+import json
 import runpy
 import site
 import sysconfig
+import tempfile
 import threading
 import time
 from abc import ABC, abstractmethod
@@ -57,6 +59,8 @@ class PyftraceBase(ABC):
         # to open the file itself
         self.output_path = None
         self.owns_output = False
+        # Where child processes leave their part of the --report
+        self.report_dir = None
         self.tracing_active = False
         self.tracer_script = os.path.abspath(__file__)
         self.tracer_dir = os.path.dirname(self.tracer_script)
@@ -154,6 +158,8 @@ class PyftraceBase(ABC):
 
         self.follow_forks()
         multiproc.follow(self)
+        if self.report_mode:
+            self.report_dir = tempfile.mkdtemp(prefix="pyftrace-report-")
 
         self.tracing_started = False
         self.setup_tracing()
@@ -184,6 +190,8 @@ class PyftraceBase(ABC):
 
     def enter_child(self):
         self.pid = os.getpid()
+        # The copy of the parent's report stays with the parent
+        self.execution_report = {}
         # The forking thread is the only one left and is now the main one
         self.main_thread = threading.get_ident()
         self.thread_states = threading.local()
@@ -212,6 +220,7 @@ class PyftraceBase(ABC):
                 "file_filter": self.file_filter,
                 "file_exclude": self.file_exclude,
                 "output_path": self.output_path,
+                "report_dir": self.report_dir,
                 "script_name": self.script_name,
                 "script_dir": self.script_dir,
                 "import_end_line": self.import_end_line,
@@ -233,6 +242,7 @@ class PyftraceBase(ABC):
 
     def finish_child(self):
         self.tracing_started = False
+        self.save_child_report()
         for collapser in self.collapsers:
             collapser.finish()
         if self.output_stream:
@@ -310,8 +320,37 @@ class PyftraceBase(ABC):
             total_time, call_count = self.execution_report.get(func_name, (0, 0))
             self.execution_report[func_name] = (total_time + exec_time, call_count + 1)
 
+    def save_child_report(self):
+        """
+        Leave the report of a child process where the process that
+        prints the report will find it.
+        """
+        if not self.report_dir or not self.execution_report:
+            return
+        path = os.path.join(self.report_dir, f"{os.getpid()}.json")
+        try:
+            with open(path, "w") as file:
+                json.dump(self.execution_report, file)
+        except OSError:
+            pass
+
+    def collect_child_reports(self):
+        if not self.report_dir:
+            return
+        for name in os.listdir(self.report_dir):
+            path = os.path.join(self.report_dir, name)
+            with open(path) as file:
+                child_report = json.load(file)
+            os.remove(path)
+            for func_name, (child_time, child_count) in child_report.items():
+                total_time, call_count = self.execution_report.get(func_name, (0, 0))
+                self.execution_report[func_name] = (total_time + child_time, call_count + child_count)
+        os.rmdir(self.report_dir)
+        self.report_dir = None
+
     def print_report(self, stream=None):
         stream = stream or self.output_stream or sys.stdout
+        self.collect_child_reports()
         if self.format is format_text:
             print("\nFunction Name\t| Total Execution Time\t| Call Count", file=stream)
             print("---------------------------------------------------------", file=stream)

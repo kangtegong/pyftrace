@@ -541,6 +541,23 @@ Results: ret_a, ret_b
         """
         self.check_processes([])
 
+    def test_processes_report(self):
+        """
+        Test that '--report' includes the calls made in a child process.
+        """
+        args = ['--report', '--format', 'json', self.processes_script]
+        result = self.run_pyftrace(args)
+
+        calls = {}
+        for line in result.stdout.splitlines():
+            event = json.loads(line)
+            if event["event"] == "report":
+                calls[event["function"]] = event["calls"]
+
+        # worker() runs in the child only, square() once in each process
+        self.assertEqual({"main": 1, "worker": 1, "square": 2}, calls)
+        self.assertEqual(result.returncode, 0)
+
     def test_processes_output_file(self):
         """
         Test that a child process writes its trace to the '--output' file.
