@@ -19,25 +19,37 @@ pyftrace의 주요 기능:
 
 ```
 $ pyftrace --help
-usage: pyftrace [options] [tui] script [script_args ...]
+usage: pyftrace [options] [tui] (script | -m module) [args ...]
 
 pyftrace: Python function tracing tool.
 
 positional arguments:
-  script         Path to the script to run and trace. Specify 'tui' before the script path to run in TUI mode.
+  script                Path to the script to run and trace. Specify 'tui' before the script path to run in TUI mode.
 
 options:
-  -h, --help     show this help message and exit
-  -V, --version  Show the version of pyftrace and exit
-  -v, --verbose  Enable built-in and third-party function tracing
-  -p, --path     Show file paths in tracing output
-  -r, --report   Generate a report of function execution times
+  -h, --help            show this help message and exit
+  -V, --version         Show the version of pyftrace and exit
+  -v, --verbose         Enable built-in and third-party function tracing
+  -p, --path            Show file paths in tracing output
+  -r, --report          Generate a report of function execution times
   -d DEPTH, --depth DEPTH
                         Limit the tracing output to DEPTH
+  -n LINES, --max-lines LINES
+                        Stop printing the trace after LINES lines. The program keeps running
+  -c, --collapse        Print a call that repeats the one before it only once, followed by a repeat count
   -f FUNCTION, --function FUNCTION
-                        Trace only calls of <function> and its subcalls
+                        Trace only calls of <function> and its subcalls. Can be repeated
   -e EXCLUDE_FUNCTION, --exclude-function EXCLUDE_FUNCTION
-                        Exclude calls of <function> (and its subcalls) from tracing
+                        Exclude calls of <function> (and its subcalls) from tracing. Can be repeated
+  -F PATH, --file PATH  Trace only functions defined in PATH: a file, a directory or a glob. Can be repeated
+  -E PATH, --exclude-file PATH
+                        Do not trace functions defined in PATH. Can be repeated
+  -a, --argument        Show function arguments in tracing output (Python frames only)
+  --format {json,text}  Output format: 'text' (default) or 'json', one JSON object per line
+  -o OUTPUT, --output OUTPUT
+                        Write tracing output to a file. The traced program's own output is not redirected
+  -m MODULE             Run and trace a library module as a script, like 'python -m'.
+                        Everything after MODULE is passed to the module.
 ```
 
 ## 사용법
