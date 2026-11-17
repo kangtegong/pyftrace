@@ -5,6 +5,7 @@ import os
 import re
 import json
 import importlib.util
+import random
 import shutil
 import tempfile
 import textwrap
@@ -13,6 +14,7 @@ import time
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from pyftrace import __version__ as pyftrace_version
+from pyftrace.output import Collapser
 
 class PyftraceTestCase(unittest.TestCase):
     @classmethod
@@ -1366,6 +1368,130 @@ class ConcurrencyTests(PyftraceTestCase):
 
         self.assertEqual(3, rows["square"]["calls"])
         self.assertEqual("", result.stderr)
+
+class CollapserTests(unittest.TestCase):
+    """
+    The folding of repeated calls, on trace events directly.
+    """
+
+    @staticmethod
+    def call(depth, name, children=(), returns=True):
+        events = [{"event": "call", "depth": depth, "function": name}]
+        for child in children:
+            events += child
+        if returns:
+            events.append({"event": "return", "depth": depth, "function": name})
+        return events
+
+    @staticmethod
+    def collapse(events):
+        output = []
+        collapser = Collapser(output.append)
+        for event in events:
+            collapser.feed(event)
+        collapser.finish()
+        return output
+
+    @staticmethod
+    def expand(output):
+        """
+        Undo the folding: a repeat event stands for copies of the call
+        right before it.
+        """
+        events = []
+        for event in output:
+            if event["event"] != "repeat":
+                events.append(event)
+                continue
+            start = len(events) - 1
+            while not (events[start]["event"] == "call"
+                       and events[start]["depth"] == event["depth"]):
+                start -= 1
+            events.extend(events[start:] * event["count"])
+        return events
+
+    def test_repeat(self):
+        call = self.call
+        events = call(1, "run", [call(2, "tick")] * 5)
+
+        self.assertEqual(
+            call(1, "run", [call(2, "tick"),
+                            [{"event": "repeat", "depth": 2, "count": 4}]]),
+            self.collapse(events))
+
+    def test_different_calls_are_kept(self):
+        call = self.call
+        events = call(1, "run", [call(2, "a"), call(2, "b"), call(2, "a")])
+
+        self.assertEqual(events, self.collapse(events))
+
+    def test_repeat_at_top_level(self):
+        events = self.call(1, "tick") * 3
+
+        self.assertEqual(
+            self.call(1, "tick") + [{"event": "repeat", "depth": 1, "count": 2}],
+            self.collapse(events))
+
+    def test_partial_repeat_is_released(self):
+        call = self.call
+        # The second call starts like the first but goes on differently
+        first = call(2, "step", [call(3, "a"), call(3, "b")])
+        second = call(2, "step", [call(3, "a"), call(3, "c")])
+        events = call(1, "run", [first, second])
+
+        self.assertEqual(events, self.collapse(events))
+
+    def test_unfinished_trace(self):
+        call = self.call
+        # The program ends in the middle of a call that looked like a repeat
+        events = call(1, "run", [call(2, "tick"), call(2, "tick"),
+                                 call(2, "tick", returns=False)],
+                      returns=False)
+
+        self.assertEqual(events, self.expand(self.collapse(events)))
+        self.assertEqual(events[-1], self.collapse(events)[-1])
+
+    def test_long_call_is_not_held_back(self):
+        call = self.call
+        children = [call(2, f"step{number}")
+                    for number in range(Collapser.MAX_EVENTS)]
+        events = call(1, "big", children) * 2
+
+        self.assertEqual(events, self.collapse(events))
+
+    def random_calls(self, depth, rng, budget):
+        events = []
+        template = None
+        for _ in range(rng.choice([0, 1, 2, 3, 5])):
+            if budget[0] <= 0:
+                break
+            budget[0] -= 1
+            if template is not None and rng.random() < 0.6:
+                events.extend(template)
+                continue
+            children = []
+            if depth < 5:
+                children = [self.random_calls(depth + 1, rng, budget)]
+            template = self.call(depth, rng.choice("abc"), children)
+            template[-1]["event"] = rng.choice(["return", "return", "raise"])
+            events.extend(template)
+        return events
+
+    def test_folding_loses_nothing(self):
+        """
+        Test on random call trees that expanding the folded trace gives
+        back the original, also when the trace is cut off in the middle.
+        """
+        rng = random.Random(1)
+        folded = 0
+        for trial in range(500):
+            events = self.random_calls(1, rng, [rng.choice([5, 20, 80, 400])])
+            if rng.random() < 0.2 and len(events) > 2:
+                events = events[:rng.randrange(1, len(events))]
+            output = self.collapse(events)
+            self.assertEqual(events, self.expand(output), f"trial {trial}")
+            folded += len(events) - len(output)
+        self.assertGreater(folded, 0)
 
 def has_module(name):
     return importlib.util.find_spec(name) is not None
