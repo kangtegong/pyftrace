@@ -85,6 +85,8 @@ $ pip install pyftrace
 - `--max-lines` or `-n <lines>`: Stop printing the trace after the given number of lines. The traced program keeps running to the end.
 - `--function` or `-f`: Filter the names of function to be traced. Can be given more than once.
 - `--exclude-function` or `-e`: Exclude the specified function from the trace. Can be given more than once.
+- `--file` or `-F <path>`: Trace only functions defined in the given file, directory or glob pattern, e.g. `-F src/mypkg`. Can be given more than once.
+- `--exclude-file` or `-E <path>`: Do not trace functions defined in the given file, directory or glob pattern. Can be given more than once.
 
 ## TUI
 

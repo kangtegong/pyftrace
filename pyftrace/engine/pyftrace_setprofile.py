@@ -97,6 +97,10 @@ class PyftraceSetprofile(PyftraceBase):
                 elif self.verbose and module_name == 'builtins':
                     trace_this = True
 
+        # For a C function, frame is the caller: it belongs to that file
+        owner = filename or frame.f_code.co_filename
+        trace_this = trace_this and self.file_selected(owner)
+
         if self.function_exclude and func_name in self.function_exclude:
             self.exclude_depth += 1
         if self.exclude_depth > 0:
@@ -187,6 +191,9 @@ class PyftraceSetprofile(PyftraceBase):
                     if self.verbose and module_name == 'builtins':
                         if self.call_stack and self.call_stack[-1] == func_name:
                             trace_this = True
+
+        owner = filename or frame.f_code.co_filename
+        trace_this = trace_this and self.file_selected(owner)
 
         if self.function_filter:
             if self.filter_depth == 0:

@@ -2,6 +2,7 @@ import sys
 import os
 import weakref
 import dis
+import fnmatch
 import importlib.util
 
 # A frame that returns or yields normally stops at one of these
@@ -91,6 +92,24 @@ def find_import_end_line(script_path):
     else:
         return 0
 
+
+def normalize_patterns(patterns):
+    """
+    Prepare the paths given with -F and -E for path_matches().
+    """
+    return tuple(os.path.normcase(os.path.abspath(p)) for p in patterns or ())
+
+def path_matches(path, patterns):
+    """
+    True if path is one of the patterns, lies in a directory that is,
+    or matches one as a glob.
+    """
+    for pattern in patterns:
+        if path == pattern or path.startswith(os.path.join(pattern, '')):
+            return True
+        if fnmatch.fnmatchcase(path, pattern):
+            return True
+    return False
 
 def find_module_file(module_name):
     """

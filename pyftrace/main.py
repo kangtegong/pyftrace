@@ -1,7 +1,7 @@
 import sys
 import argparse
 from .tracer import get_tracer
-from .utils import find_module_file
+from .utils import find_module_file, normalize_patterns
 from .tui import run_tui
 from . import __version__
 import tempfile
@@ -44,6 +44,8 @@ def main():
     parser.add_argument('-n', '--max-lines', type=int, metavar='LINES', help="Stop printing the trace after LINES lines. The program keeps running")
     parser.add_argument('-f', '--function', action='append', help="Trace only calls of <function> and its subcalls. Can be repeated")
     parser.add_argument('-e', '--exclude-function', action='append', help="Exclude calls of <function> (and its subcalls) from tracing. Can be repeated")
+    parser.add_argument('-F', '--file', action='append', metavar='PATH', help="Trace only functions defined in PATH: a file, a directory or a glob. Can be repeated")
+    parser.add_argument('-E', '--exclude-file', action='append', metavar='PATH', help="Do not trace functions defined in PATH. Can be repeated")
     parser.add_argument('-a', '--argument', action='store_true', help="Show function arguments in tracing output (Python frames only)")
     parser.add_argument('-o', '--output', help="Write tracing output to a file. The traced program's own output is not redirected")
 
@@ -104,6 +106,8 @@ def main():
                     )
                     tracer.max_depth = tracer_depth
                     tracer.max_lines = args.max_lines
+                    tracer.file_filter = normalize_patterns(args.file)
+                    tracer.file_exclude = normalize_patterns(args.exclude_file)
                     run_target(tracer, module, script_path, target_args)
                 run_tui(temp_file_path)
 
@@ -122,6 +126,8 @@ def main():
             )
             tracer.max_depth = tracer_depth
             tracer.max_lines = args.max_lines
+            tracer.file_filter = normalize_patterns(args.file)
+            tracer.file_exclude = normalize_patterns(args.exclude_file)
             run_target(tracer, module, script_path, target_args)
 
             if args.report:

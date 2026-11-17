@@ -97,6 +97,12 @@ class PyftraceMonitoring(PyftraceBase):
                 if self.verbose and self.should_trace(def_filename):
                     trace_this = True
 
+        # A function without a source file belongs to the file calling it
+        if hasattr(callable_obj, '__code__'):
+            trace_this = trace_this and self.file_selected(def_filename)
+        else:
+            trace_this = trace_this and self.file_selected(call_filename)
+
         if self.function_exclude and func_name in self.function_exclude:
             self.exclude_depth += 1
         if self.exclude_depth > 0:
@@ -145,6 +151,7 @@ class PyftraceMonitoring(PyftraceBase):
             return
 
         trace_this = self.should_trace(filename) or self.verbose
+        trace_this = trace_this and self.file_selected(filename)
 
         if self.function_filter:
             if self.filter_depth == 0:
@@ -190,6 +197,8 @@ class PyftraceMonitoring(PyftraceBase):
         else:
             if self.verbose and self.should_trace(filename):
                 trace_this = True
+
+        trace_this = trace_this and self.file_selected(filename)
 
         if self.exclude_depth > 0:
             if self.function_exclude and func_name in self.function_exclude:

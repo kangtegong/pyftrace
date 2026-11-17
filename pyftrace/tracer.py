@@ -6,6 +6,7 @@ import sysconfig
 from abc import ABC, abstractmethod
 from .utils import find_import_end_line, find_module_file
 from .utils import format_exception, safe_str
+from .utils import path_matches
 
 # Marks a function exit that has no value to show
 NO_VALUE = object()
@@ -43,6 +44,10 @@ class PyftraceBase(ABC):
         self.filter_depth = 0
         self.function_exclude = frozenset(function_exclude or ())
         self.exclude_depth = 0
+
+        # Normalized paths given with -F and -E
+        self.file_filter = ()
+        self.file_exclude = ()
 
     @abstractmethod
     def setup_tracing(self):
@@ -187,6 +192,19 @@ class PyftraceBase(ABC):
         if not self.verbose and self.is_site_code(abs_file_name):
             return False
         return True
+
+    def file_selected(self, file_name):
+        """
+        Apply -F and -E to the file a function belongs to.
+        """
+        if not self.file_filter and not self.file_exclude:
+            return True
+        if not file_name:
+            return not self.file_filter
+        path = os.path.normcase(os.path.abspath(file_name))
+        if path_matches(path, self.file_exclude):
+            return False
+        return not self.file_filter or path_matches(path, self.file_filter)
 
     @staticmethod
     def is_pseudo_file(file_name):
