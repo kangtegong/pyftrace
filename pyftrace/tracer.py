@@ -279,6 +279,9 @@ class PyftraceBase(ABC):
             if self.is_truncated():
                 event = {"event": "truncated", "max_lines": self.max_lines}
             self.output_stream.write(self.format(event) + "\n")
+            # A trace is read to find out why a program died, and a
+            # program that dies does not flush its buffers.
+            self.output_stream.flush()
 
     def should_trace(self, file_name):
         if not file_name:
