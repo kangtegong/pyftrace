@@ -4,12 +4,13 @@ import sys
 import os
 import re
 import json
+import importlib.util
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from pyftrace import __version__ as pyftrace_version
 
-class PyftraceTests(unittest.TestCase):
+class PyftraceTestCase(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         """
@@ -87,6 +88,7 @@ class PyftraceTests(unittest.TestCase):
         normalized = normalized.replace("\r\n", "\n").replace("\\", "/")
         return normalized
 
+class PyftraceTests(PyftraceTestCase):
     def test_version_flag_short_v(self):
         """
         Test '-V' flag for version display.
@@ -640,9 +642,111 @@ Results: ret_a, ret_b
     #     self.assertRegex(actual_output, expected_output_pattern)
     #     self.assertEqual(result.returncode, 0)
 
+def has_module(name):
+    return importlib.util.find_spec(name) is not None
+
+class RealWorldExampleTests(PyftraceTestCase):
+    """
+    Trace the examples that are built on large libraries.  A test is
+    skipped where its library is not installed.
+    """
+
+    def trace_example(self, name):
+        """
+        Run an example with '--format json' and return its events as
+        (event, depth, function) tuples, down to depth 3.  Line numbers
+        and values depend on the version of the library and are left
+        out.  So are the events of child processes, which a library may
+        or may not start.
+        """
+        script = os.path.join(self.project_root, 'examples', name)
+        result = self.run_pyftrace(['--format', 'json', script])
+        self.assertEqual(result.returncode, 0)
+
+        self.events = []
+        for line in result.stdout.splitlines():
+            if not line.startswith('{"event"'):
+                continue
+            event = json.loads(line)
+            if "depth" in event and "pid" not in event:
+                self.events.append(event)
+        return [(event["event"], event["depth"], event["function"])
+                for event in self.events if event["depth"] <= 3]
+
+    @staticmethod
+    def call(depth, function, children=()):
+        """
+        The events of a call that returns, with those of its callees.
+        """
+        events = [("call", depth, function)]
+        for child in children:
+            events += child
+        return events + [("return", depth, function)]
+
+    @unittest.skipUnless(has_module("django"), "Django is not installed")
+    def test_django_example(self):
+        """
+        Test that only the application code of a Django request is traced.
+        """
+        call = self.call
+        request_list = call(2, "__call__", [
+            call(3, "article_list"),
+        ])
+        request_detail = call(2, "__call__", [
+            call(3, "article_detail"),
+        ])
+        # find_article() raises Http404, Django turns it into a response
+        request_missing = call(2, "__call__", [
+            [("call", 3, "article_detail"), ("raise", 3, "article_detail")],
+        ])
+        expected_events = call(1, "main", [
+            call(2, "__init__"),
+            request_list,
+            request_detail,
+            request_missing,
+        ])
+
+        self.assertEqual(expected_events,
+                         self.trace_example('django_example.py'))
+
+        raised = [event for event in self.events if event["event"] == "raise"]
+        self.assertEqual(["find_article", "article_detail"],
+                         [event["function"] for event in raised])
+        if sys.version_info >= (3, 12):
+            self.assertEqual("Http404: No article 99", raised[0]["exception"])
+
+    @unittest.skipUnless(has_module("torch"), "PyTorch is not installed")
+    def test_pytorch_example(self):
+        """
+        Test that the structure of a PyTorch training loop is traced.
+        """
+        call = self.call
+        epoch = call(2, "train_epoch", [call(3, "train_step")] * 4)
+        expected_events = call(1, "main", [
+            call(2, "__init__"),
+            epoch,
+            epoch,
+            epoch,
+            call(2, "evaluate", [call(3, "make_batch"), call(3, "forward")]),
+        ])
+
+        self.assertEqual(expected_events,
+                         self.trace_example('pytorch_example.py'))
+
+        # forward() is called by PyTorch: once per step and once to evaluate
+        forward_calls = [event for event in self.events
+                         if event["event"] == "call"
+                         and event["function"] == "forward"]
+        self.assertEqual(13, len(forward_calls))
+
 if __name__ == '__main__':
     runner = unittest.TextTestRunner(verbosity=2)
-    result = runner.run(unittest.TestLoader().loadTestsFromTestCase(PyftraceTests))
+    loader = unittest.TestLoader()
+    suite = unittest.TestSuite([
+        loader.loadTestsFromTestCase(PyftraceTests),
+        loader.loadTestsFromTestCase(RealWorldExampleTests),
+    ])
+    result = runner.run(suite)
     if not result.wasSuccessful():
         sys.exit(1)
     else:
