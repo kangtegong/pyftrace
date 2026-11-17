@@ -26,6 +26,7 @@ class PyftraceTests(unittest.TestCase):
         cls.recursive_script = os.path.join(cls.project_root, 'examples', 'recursives.py')
         cls.loop_script = os.path.join(cls.project_root, 'examples', 'loop.py')
         cls.threads_script = os.path.join(cls.project_root, 'examples', 'threads.py')
+        cls.processes_script = os.path.join(cls.project_root, 'examples', 'processes.py')
         cls.add_script = os.path.join(cls.project_root, 'examples', 'add.py')
         cls.temp_output = os.path.join(cls.project_root, 'tests', 'tmp_output.txt')
 
@@ -482,6 +483,45 @@ Results: ret_a, ret_b
 
         self.assertEqual(normalized_expected, normalized_actual)
         self.assertEqual(result.returncode, 0)
+
+    def check_processes(self, extra_args):
+        result = self.run_pyftrace(extra_args + [self.processes_script])
+        trace = result.stdout
+        if '--output' in extra_args:
+            with open(self.temp_output, 'r') as f:
+                trace = f.read()
+
+        expected_output = f"""Running script: {self.processes_script}
+    Called main from line 16
+[pid N]     Called worker from line N
+[pid N]         Called square from line 7
+[pid N]         Returning square-> 9
+[pid N]     Returning worker-> 9
+        Called square from line 13
+        Returning square-> 16
+    Returning main-> 16"""
+
+        # The pid and the line in multiprocessing that calls worker vary
+        actual = re.sub(r"\[pid \d+\]", "[pid N]", trace)
+        actual = re.sub(r"(Called worker from line) \d+", r"\1 N", actual)
+
+        normalized_expected = self.normalize_output(expected_output)
+        normalized_actual = self.normalize_output(actual)
+
+        self.assertEqual(normalized_expected, normalized_actual)
+        self.assertEqual(result.returncode, 0)
+
+    def test_processes(self):
+        """
+        Test that a child process started by multiprocessing is traced.
+        """
+        self.check_processes([])
+
+    def test_processes_output_file(self):
+        """
+        Test that a child process writes its trace to the '--output' file.
+        """
+        self.check_processes(['--output', self.temp_output])
 
     # def test_tracing_script_path(self):
     #     """

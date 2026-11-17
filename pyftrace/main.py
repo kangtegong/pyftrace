@@ -88,7 +88,11 @@ def main():
     output_stream = sys.stdout
     output_file_handle = None
     if args.output:
-        output_file_handle = open(args.output, "w", encoding="utf-8")
+        # Child processes append to the same file, so the writes of this
+        # process must go to its end too.  Empty it first.
+        open(args.output, "w").close()
+        output_file_handle = open(args.output, "a", buffering=1,
+                                  encoding="utf-8")
         output_stream = output_file_handle
 
     try:
@@ -97,7 +101,7 @@ def main():
                 temp_file_path = temp_file.name
 
             try:
-                with open(temp_file_path, "w") as f:
+                with open(temp_file_path, "a", buffering=1) as f:
                     tracer = get_tracer(
                         verbose=args.verbose,
                         show_path=args.path,
@@ -107,6 +111,7 @@ def main():
                         function_exclude=func_exclude,
                         trace_arguments=args.argument
                     )
+                    tracer.output_path = temp_file_path
                     tracer.max_depth = tracer_depth
                     tracer.max_lines = args.max_lines
                     tracer.collapse = args.collapse
@@ -128,6 +133,7 @@ def main():
                 function_exclude=func_exclude,
                 trace_arguments=args.argument
             )
+            tracer.output_path = args.output
             tracer.max_depth = tracer_depth
             tracer.max_lines = args.max_lines
             tracer.collapse = args.collapse

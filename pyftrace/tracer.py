@@ -9,6 +9,7 @@ from .utils import find_import_end_line, find_module_file
 from .utils import format_exception, safe_str
 from .utils import path_matches
 from .output import Collapser, format_text
+from . import multiproc
 
 # Marks a function exit that has no value to show
 NO_VALUE = object()
@@ -47,6 +48,11 @@ class PyftraceBase(ABC):
         # that pyftrace was started in
         self.pid = None
         self.fork_hooked = False
+        # Where the trace goes if not to stdout; a spawned process has
+        # to open the file itself
+        self.output_path = None
+        self.owns_output = False
+        self.tracing_active = False
         self.tracer_script = os.path.abspath(__file__)
         self.tracer_dir = os.path.dirname(self.tracer_script)
         self.tracing_started = False
@@ -142,9 +148,11 @@ class PyftraceBase(ABC):
         self.thread_states = threading.local()
 
         self.follow_forks()
+        multiproc.follow(self)
 
         self.tracing_started = False
         self.setup_tracing()
+        self.tracing_active = True
 
         try:
             try:
@@ -177,6 +185,60 @@ class PyftraceBase(ABC):
         # Another thread may have held the lock when the process forked
         self.output_lock = threading.Lock()
         self.collapsers = []
+
+    def child_config(self):
+        """
+        Everything a spawned process needs to build a tracer like this.
+        """
+        return {
+            "arguments": {
+                "verbose": self.verbose,
+                "show_path": self.show_path,
+                "report_mode": self.report_mode,
+                "function_filter": sorted(self.function_filter),
+                "function_exclude": sorted(self.function_exclude),
+                "trace_arguments": self.trace_arguments,
+            },
+            "attributes": {
+                "max_depth": self.max_depth,
+                "max_lines": self.max_lines,
+                "collapse": self.collapse,
+                "format": self.format,
+                "file_filter": self.file_filter,
+                "file_exclude": self.file_exclude,
+                "output_path": self.output_path,
+                "script_name": self.script_name,
+                "script_dir": self.script_dir,
+                "import_end_line": self.import_end_line,
+            },
+        }
+
+    def start_child(self):
+        """
+        Called in a child process right before it runs its target.
+        """
+        if self.pid != os.getpid():
+            self.enter_child()
+        if not self.tracing_active:
+            # A spawned process: nothing was inherited, start from scratch
+            self.follow_forks()
+            self.setup_tracing()
+            self.tracing_active = True
+        self.tracing_started = True
+
+    def finish_child(self):
+        self.tracing_started = False
+        for collapser in self.collapsers:
+            collapser.finish()
+        if self.output_stream:
+            self.output_stream.flush()
+        if self.owns_output:
+            # Opened by tracer_from_config().  Left open, the file would
+            # only be closed while the interpreter is being torn down.
+            self.output_stream.close()
+        self.output_stream = None
+        self.cleanup_tracing()
+        self.tracing_active = False
 
     @staticmethod
     def wait_for_threads():
@@ -391,6 +453,23 @@ class PyftraceBase(ABC):
 # Import engine modules AFTER defining PyftraceBase (avoid circular imports)
 from .engine.pyftrace_monitoring import PyftraceMonitoring
 from .engine.pyftrace_setprofile import PyftraceSetprofile
+
+def tracer_from_config(config):
+    """
+    Build the tracer of a spawned process from child_config().
+    """
+    attributes = config["attributes"]
+    output_stream = sys.stdout
+    if attributes["output_path"]:
+        output_stream = open(attributes["output_path"], "a", buffering=1,
+                             encoding="utf-8")
+
+    tracer = get_tracer(output_stream=output_stream, **config["arguments"])
+    for name, value in attributes.items():
+        setattr(tracer, name, value)
+    tracer.pid = os.getpid()
+    tracer.owns_output = bool(attributes["output_path"])
+    return tracer
 
 def get_tracer(verbose=False, show_path=False, report_mode=False, output_stream=sys.stdout, function_filter=None, function_exclude=None, trace_arguments=False):
     # Argument tracing requires access to frame locals, which is only available

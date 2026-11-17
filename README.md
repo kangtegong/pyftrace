@@ -19,6 +19,7 @@ Key features of pyftrace include:
 - **Execution Reports**: Generate reports detailing function execution times and call counts with the `--report` flag.
 - **Path Tracing**: Trace the path of traced Python file using the `--path` flag.
 - **TUI Mode**: Run pyftrace in a Text User Interface (TUI) mode using the `tui` command.
+- **Threads and Processes**: Trace the threads of a program and the processes it starts with `multiprocessing` or `os.fork()`. Their lines are marked with `[tid N]` and `[pid N]`.
 - **Function Filtering**: Filter the function you want to track with the `--function` and `--exclude-function` flag.
 
 ```
