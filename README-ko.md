@@ -77,6 +77,7 @@ $ pip install pyftrace
 - `--help` 또는 `-h`: pyftrace 및 해당 옵션에 대한 도움말 정보를 표시합니다.
 - `--version` 또는 `-V`: pyftrace 버전을 출력합니다.
 - `--depth` 또는 `-d`: 함수 호출 추적 깊이를 제한합니다.
+- `--max-lines` 또는 `-n <lines>`: 지정한 줄 수만큼 출력한 뒤 트레이싱 출력을 멈춥니다. 추적 대상 프로그램은 끝까지 실행됩니다.
 - `--function` 또는 `-f`: 특정 함수만 추적하고 해당 하위 호출을 모니터링합니다.
 - ` --exclude-function` or `-e`: 특정 함수를 추적에서 제외합니다.
 

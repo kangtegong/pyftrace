@@ -24,6 +24,8 @@ class PyftraceBase(ABC):
         self.output_stream = output_stream
         self.import_end_line = 0
         self.max_depth = None
+        self.max_lines = None
+        self.emitted_lines = 0
         self.trace_arguments = trace_arguments
 
         # Get the standard library directory
@@ -118,9 +120,17 @@ class PyftraceBase(ABC):
         """
         if self.report_mode or not self.output_stream:
             return False
+        if self.is_truncated():
+            return False
         return self.max_depth is None or self.current_depth() <= self.max_depth
 
+    def is_truncated(self):
+        return self.max_lines is not None and self.emitted_lines > self.max_lines
+
     def emit(self, line):
+        self.emitted_lines += 1
+        if self.is_truncated():
+            line = f"... trace truncated after {self.max_lines} lines"
         print(line, file=self.output_stream)
 
     def should_trace(self, file_name):

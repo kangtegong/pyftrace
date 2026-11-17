@@ -41,6 +41,7 @@ def main():
     parser.add_argument('-p', '--path', action='store_true', help="Show file paths in tracing output")
     parser.add_argument('-r', '--report', action='store_true', help="Generate a report of function execution times")
     parser.add_argument('-d', '--depth', type=int, help="Limit the tracing output to DEPTH")
+    parser.add_argument('-n', '--max-lines', type=int, metavar='LINES', help="Stop printing the trace after LINES lines. The program keeps running")
     parser.add_argument('-f', '--function', help="Trace only calls of <function> and its subcalls")
     parser.add_argument('-e', '--exclude-function', help="Exclude calls of <function> (and its subcalls) from tracing")
     parser.add_argument('-a', '--argument', action='store_true', help="Show function arguments in tracing output (Python frames only)")
@@ -102,6 +103,7 @@ def main():
                         trace_arguments=args.argument
                     )
                     tracer.max_depth = tracer_depth
+                    tracer.max_lines = args.max_lines
                     run_target(tracer, module, script_path, target_args)
                 run_tui(temp_file_path)
 
@@ -119,6 +121,7 @@ def main():
                 trace_arguments=args.argument
             )
             tracer.max_depth = tracer_depth
+            tracer.max_lines = args.max_lines
             run_target(tracer, module, script_path, target_args)
 
             if args.report:

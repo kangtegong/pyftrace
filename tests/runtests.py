@@ -246,6 +246,25 @@ The sum of 3.0 and 5.0 is 8.0"""
         self.assertIn("No module named", result.stdout)
         self.assertEqual(result.returncode, 1)
 
+    def test_max_lines(self):
+        """
+        Test '--max-lines' flag for truncating the trace.
+        """
+        args = ['--max-lines', '3', self.foobar_script]
+        result = self.run_pyftrace(args)
+
+        expected_output = f"""Running script: {self.foobar_script}
+    Called foo from line 9
+        Called bar from line 2
+        Returning bar-> 6
+... trace truncated after 3 lines"""
+
+        normalized_expected = self.normalize_output(expected_output)
+        normalized_actual = self.normalize_output(result.stdout)
+
+        self.assertEqual(normalized_expected, normalized_actual)
+        self.assertEqual(result.returncode, 0)
+
     # def test_tracing_script_path(self):
     #     """
     #     Test '--path' flag to include file paths in tracing.
