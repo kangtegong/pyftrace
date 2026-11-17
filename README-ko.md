@@ -309,6 +309,42 @@ function_b     	| 0.000016 seconds	| 1
 ```
 
 
+### 실전 예제
+
+`examples/` 디렉토리에는 큰 라이브러리 위에서 동작하는 프로그램도 있습니다. pyftrace는 `--verbose`를 주지 않으면 라이브러리 코드를 제외하므로, 트레이스에는 애플리케이션 코드만 나타납니다.
+
+- `django_example.py`: 미들웨어 하나와 뷰 두 개로 이루어진 단일 파일 Django 애플리케이션을 테스트 클라이언트로 호출합니다.
+- `pytorch_example.py`: 모델 클래스, 학습 스텝, 평가로 구성된 학습 루프입니다.
+
+```
+$ pip install django
+$ pyftrace examples/django_example.py
+Running script: examples/django_example.py
+    Called main from line 83
+        Called __init__ from line 63
+        Returning __init__-> None
+        Called __call__ from line 56
+            Called article_list from line 199
+                Called serialize from line 45
+                Returning serialize-> {'id': 1, 'title': 'Tracing Python'}
+                Called serialize from line 45
+                Returning serialize-> {'id': 2, 'title': 'Tracing Django'}
+            Returning article_list-> <JsonResponse status_code=200, "application/json">
+        Returning __call__-> <JsonResponse status_code=200, "application/json">
+GET /articles/ -> 200
+...
+        Called __call__ from line 56
+            Called article_detail from line 199
+                Called find_article from line 49
+                Raised find_article-> Http404: No article 99
+            Raised article_detail-> Http404: No article 99
+        Returning __call__-> <HttpResponseNotFound status_code=404, "text/html; charset=utf-8">
+GET /articles/99/ -> 404
+    Returning main-> None
+```
+
+`article_list`의 호출 위치는 Django 파일의 199번째 줄입니다. 호출한 쪽이 추적 대상이 아니어도 호출 위치의 줄 번호는 표시됩니다. 어느 파일인지는 `--path`로 확인할 수 있습니다.
+
 ### 참고
 simple-pyftrace.py는 Pycon Korea 2024 발표를 위한 간소화된 pyftrace 스크립트입니다. 약 100줄의 코드로 구성되어 있지만 기능이 제한적입니다.
 

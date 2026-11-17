@@ -313,6 +313,42 @@ function_b     	| 0.000016 seconds	| 1
 ```
 
 
+### Real-World Examples
+
+The `examples/` directory also has programs built on large libraries. pyftrace leaves library code out unless `--verbose` is given, so their traces show the application code only.
+
+- `django_example.py`: a one-file Django application with a middleware and two views, driven by the test client.
+- `pytorch_example.py`: a training loop with a model class, training steps and an evaluation.
+
+```
+$ pip install django
+$ pyftrace examples/django_example.py
+Running script: examples/django_example.py
+    Called main from line 83
+        Called __init__ from line 63
+        Returning __init__-> None
+        Called __call__ from line 56
+            Called article_list from line 199
+                Called serialize from line 45
+                Returning serialize-> {'id': 1, 'title': 'Tracing Python'}
+                Called serialize from line 45
+                Returning serialize-> {'id': 2, 'title': 'Tracing Django'}
+            Returning article_list-> <JsonResponse status_code=200, "application/json">
+        Returning __call__-> <JsonResponse status_code=200, "application/json">
+GET /articles/ -> 200
+...
+        Called __call__ from line 56
+            Called article_detail from line 199
+                Called find_article from line 49
+                Raised find_article-> Http404: No article 99
+            Raised article_detail-> Http404: No article 99
+        Returning __call__-> <HttpResponseNotFound status_code=404, "text/html; charset=utf-8">
+GET /articles/99/ -> 404
+    Returning main-> None
+```
+
+`article_list` is called from line 199 of a Django file: the line of the caller is shown even when the caller itself is not traced. Use `--path` to see which file it is.
+
 ### Notes
 - simple-pyftrace.py is a simplified pyftrace script for the [Pycon Korea 2024](https://2024.pycon.kr/) presentation. It is about 100 lines of code, but has limited functionality. 
 
