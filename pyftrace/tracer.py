@@ -80,9 +80,8 @@ class PyftraceBase(ABC):
         self.trace_arguments = trace_arguments
 
         # Get the standard library directory
-        paths = sysconfig.get_paths()
         self.stdlib_dirs = self.normalize_dirs(
-            [paths["stdlib"], paths["platstdlib"]])
+            [sysconfig.get_paths()["stdlib"]])
         self.site_dirs = self.find_site_dirs()
 
         # Sets of function names given with -f and -e
@@ -533,7 +532,9 @@ class PyftraceBase(ABC):
         if os.path.basename(file_name).startswith('<frozen'):
             return True  # Exclude frozen modules
         abs_file_name = os.path.normcase(os.path.abspath(file_name))
-        return abs_file_name.startswith(self.stdlib_dirs)
+        # site-packages is often a subdirectory of the standard library's
+        return (abs_file_name.startswith(self.stdlib_dirs)
+                and not abs_file_name.startswith(self.site_dirs))
 
 # Import engine modules AFTER defining PyftraceBase (avoid circular imports)
 from .engine.pyftrace_monitoring import PyftraceMonitoring
