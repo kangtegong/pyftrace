@@ -200,7 +200,10 @@ class PyftraceTests(PyftraceTestCase):
         """
         Test '--verbose' flag for detailed tracing.
         """
-        args = [self.main_script, '--verbose']
+        # An environment may have import hooks in site-packages, which
+        # --verbose would show for every import.  Stay within the examples.
+        examples = os.path.join(self.project_root, 'examples')
+        args = [self.main_script, '--verbose', '--file', examples]
         result = self.run_pyftrace(args)
 
         expected_output = f"""Running script: {self.main_script}
