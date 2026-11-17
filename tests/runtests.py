@@ -62,12 +62,13 @@ class PyftraceTestCase(unittest.TestCase):
             print("\nSTDERR:")
             print(self.error)
 
-    def run_pyftrace(self, args):
+    def run_pyftrace(self, args, cwd=None):
         """
         Helper method to run the pyftrace command with given arguments.
 
         Args:
             args (list): List of command-line arguments.
+            cwd (str): Directory to run in instead of the project root.
 
         Returns:
             subprocess.CompletedProcess: The result of the subprocess.run() execution.
@@ -77,7 +78,9 @@ class PyftraceTestCase(unittest.TestCase):
             cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            cwd=self.project_root,
+            cwd=cwd or self.project_root,
+            # pyftrace is run from the source tree, wherever the command runs
+            env=dict(os.environ, PYTHONPATH=self.project_root),
             text=True
         )
         self.output = result.stdout
@@ -909,6 +912,37 @@ class OptionTests(PyftraceTestCase):
             "        Raised len",
             "    Returning size-> 0",
         ], self.trace_lines(result.stdout))
+
+    def test_module_package(self):
+        """
+        Test '-m' with a package, which runs its __main__ module.
+        """
+        directory = tempfile.mkdtemp(prefix="pyftrace-test-")
+        self.addCleanup(shutil.rmtree, directory, True)
+        package = os.path.join(directory, "shapes")
+        os.mkdir(package)
+        with open(os.path.join(package, "__init__.py"), "w") as f:
+            f.write("def area(side):\n    return side * side\n")
+        with open(os.path.join(package, "__main__.py"), "w") as f:
+            f.write("import sys\nfrom shapes import area\n\n"
+                    "def main(argv):\n    print(area(int(argv[0])))\n\n"
+                    "main(sys.argv[1:])\n")
+
+        result = self.run_pyftrace(['-m', 'shapes', '7'], cwd=directory)
+
+        self.assertEqual("Running module: shapes", result.stdout.splitlines()[0])
+        self.assertEqual([
+            "    Called main from line 7",
+            "        Called area from line 5",
+            "        Returning area-> 49",
+            "    Returning main-> None",
+        ], self.trace_lines(result.stdout))
+
+        # The package can also be named to -F, which selects all its files
+        result = self.run_pyftrace(['-E', 'shapes', '-m', 'shapes', '7'],
+                                   cwd=directory)
+        self.assertEqual([], self.trace_lines(result.stdout))
+        self.assertIn("49", result.stdout)
 
     def test_script_arguments_and_exit_code(self):
         """
