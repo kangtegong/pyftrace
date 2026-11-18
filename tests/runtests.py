@@ -1058,6 +1058,37 @@ class OptionTests(PyftraceTestCase):
         self.assertIn("a script or -m module is required", result.stderr)
         self.assertEqual(result.returncode, 2)
 
+    def test_traceback_of_program(self):
+        """
+        A program that dies of an exception leaves the traceback python
+        would print for it, without the frames of pyftrace.
+        """
+        result = self.run_source("""
+            def work():
+                raise KeyError("missing")
+
+            work()
+        """)
+
+        self.assertIn("Traceback (most recent call last):", result.stderr)
+        self.assertIn("in work", result.stderr)
+        self.assertIn("KeyError: 'missing'", result.stderr)
+        self.assertNotIn("pyftrace", result.stderr.replace(self.script, ""))
+        self.assertNotIn("runpy", result.stderr)
+        self.assertEqual(result.returncode, 1)
+
+    def test_syntax_error_of_program(self):
+        """
+        A script that does not compile is reported like python does.
+        """
+        result = self.run_source("""
+            def work(:
+        """)
+
+        self.assertIn("SyntaxError", result.stderr)
+        self.assertNotIn("Traceback", result.stderr)
+        self.assertEqual(result.returncode, 1)
+
     def test_script_options(self):
         """
         What follows the script belongs to the script, options that

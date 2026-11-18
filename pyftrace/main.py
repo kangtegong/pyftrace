@@ -6,6 +6,7 @@ from .output import FORMATS
 from .tui import run_tui
 from . import __version__
 import tempfile
+import traceback
 import os
 
 def takes_value(arg, value_options):
@@ -47,6 +48,28 @@ def split_target_args(argv, value_options):
             continue
         return argv[:i + 1], None, argv[i + 1:]
     return argv, None, []
+
+def print_program_traceback():
+    """
+    Print the traceback of an exception that ended the traced program
+    the way python would have: without the frames of pyftrace and runpy
+    that the program was started from.
+    """
+    exc_type, exc, full_tb = sys.exc_info()
+    tb = full_tb
+    own_dir = os.path.dirname(os.path.abspath(__file__)) + os.sep
+    while tb:
+        file_name = tb.tb_frame.f_code.co_filename
+        launcher = (os.path.abspath(file_name).startswith(own_dir)
+                    or os.path.basename(file_name) == 'runpy.py'
+                    or file_name == '<frozen runpy>')
+        if not launcher:
+            break
+        tb = tb.tb_next
+    if tb is None and not isinstance(exc, SyntaxError):
+        # Not raised by the program: a bug of pyftrace, show all of it
+        tb = full_tb
+    traceback.print_exception(exc_type, exc, tb)
 
 def run_target(tracer, module, script_path, target_args):
     if module:
@@ -176,6 +199,9 @@ def main():
             tracer.format = FORMATS[args.format]
             try:
                 run_target(tracer, module, script_path, target_args)
+            except Exception:
+                print_program_traceback()
+                sys.exit(1)
             finally:
                 # Also when the program ends with sys.exit() or an exception
                 if args.report:
