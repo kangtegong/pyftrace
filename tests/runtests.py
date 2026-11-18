@@ -160,6 +160,33 @@ class PyftraceTests(PyftraceTestCase):
         self.assertIn(expected_output, result.stdout)
         self.assertEqual(result.returncode, 0)
 
+    def run_into_head(self, args, lines):
+        """
+        Run pyftrace with its output piped into a reader that takes a
+        number of lines and closes the pipe.
+        """
+        cmd = [self.python_executable, '-m', self.pyftrace_module] + args
+        process = subprocess.Popen(cmd, stdout=subprocess.PIPE,
+                                   stderr=subprocess.PIPE,
+                                   cwd=self.project_root,
+                                   universal_newlines=True)
+        head = [process.stdout.readline() for _ in range(lines)]
+        process.stdout.close()
+        stderr = process.stderr.read()
+        process.stderr.close()
+        return head, stderr, process.wait()
+
+    def test_reader_closes_pipe(self):
+        """
+        'pyftrace script.py | head' ends the trace, not the program.
+        """
+        script = os.path.join(self.project_root, 'examples', 'loop.py')
+        head, stderr, status = self.run_into_head([script], 3)
+
+        self.assertIn("Called run", head[1])
+        self.assertEqual("", stderr)
+        self.assertEqual(0, status)
+
     def test_run_as_package(self):
         """
         'python -m pyftrace' is the same command as 'pyftrace', run by
