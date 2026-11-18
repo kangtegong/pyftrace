@@ -10,7 +10,7 @@ import time
 from abc import ABC, abstractmethod
 from .utils import find_import_end_line, find_module_file
 from .utils import format_exception, safe_str
-from .utils import path_matches
+from .utils import path_matches, is_closed_pipe
 from .output import Collapser, LineCounter, format_text
 from . import multiproc
 
@@ -367,7 +367,9 @@ class PyftraceBase(ABC):
         try:
             self.write_report(stream)
             stream.flush()
-        except BrokenPipeError:
+        except OSError as error:
+            if not is_closed_pipe(error):
+                raise
             self.discard(stream)
 
     def write_report(self, stream):
@@ -469,7 +471,9 @@ class PyftraceBase(ABC):
             # A trace is read to find out why a program died, and a
             # program that dies does not flush its buffers.
             self.output_stream.flush()
-        except BrokenPipeError:
+        except OSError as error:
+            if not is_closed_pipe(error):
+                raise
             self.drop_output()
 
     def drop_output(self):

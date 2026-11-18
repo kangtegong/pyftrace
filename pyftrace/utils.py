@@ -1,5 +1,6 @@
 import sys
 import os
+import errno
 import weakref
 import dis
 import fnmatch
@@ -172,6 +173,15 @@ def path_matches(path, patterns):
         if fnmatch.fnmatchcase(path, pattern):
             return True
     return False
+
+def is_closed_pipe(error):
+    """
+    True if error comes from writing to a pipe whose reader is gone.
+    Windows reports this as EINVAL, not as BrokenPipeError.
+    """
+    if isinstance(error, BrokenPipeError):
+        return True
+    return os.name == 'nt' and getattr(error, 'errno', None) == errno.EINVAL
 
 def find_module_file(module_name):
     """
