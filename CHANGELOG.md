@@ -32,6 +32,9 @@
 - On Python 3.12 and later, generators and coroutines resumed by an exception (a failed `await`, a cancelled task, `throw()`, `close()`) were missing from the trace.
 - On Python 3.12 and later, pyftrace occupied the `sys.monitoring` tool id of coverage tools.
 - Scripts could not be given arguments that start with `-`.
+- On Python 3.8 to 3.11, a program that set a profile function of its own or ran `cProfile` ended the trace.
+- `--max-lines` was overrun by a few lines when several processes printed at once.
+- Ctrl-C printed the traceback of pyftrace on top of the one of the program.
 - Quitting the TUI on Linux ended with a traceback.
 - CI and the release workflow run on current GitHub runners again.
 
