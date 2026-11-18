@@ -41,7 +41,7 @@ options:
                         Trace only calls of <function> and its subcalls. Can be repeated
   -e EXCLUDE_FUNCTION, --exclude-function EXCLUDE_FUNCTION
                         Exclude calls of <function> (and its subcalls) from tracing. Can be repeated
-  -F PATH, --file PATH  Trace only functions defined in PATH: a file, a directory or a glob. Can be repeated
+  -F PATH, --file PATH  Trace only functions defined in PATH: a file, a directory, a glob or a module name. Can be repeated
   -E PATH, --exclude-file PATH
                         Do not trace functions defined in PATH. Can be repeated
   -a, --argument        Show function arguments in tracing output (Python frames only)
@@ -115,7 +115,7 @@ $ claude plugin install pyftrace --marketplace kangtegong/pyftrace
 - `--argument` 또는 `-a`: Python 함수 인자를 출력합니다.
 - `--output` 또는 `-o <filename>`: 표준 출력 대신 파일로 트레이싱 결과를 기록합니다. 추적 대상 프로그램 자체의 출력은 그대로 표준 출력으로 나갑니다.
 - `--format <text|json>`: 출력 형식을 선택합니다. `json`이면 트레이스 이벤트를 한 줄에 JSON 객체 하나씩 출력합니다. 예: `{"event": "call", "depth": 1, "function": "foo", "line": 9}`.
-- `-m <module> [args ...]`: `python -m`처럼 모듈을 실행하며 추적합니다. 예: `pyftrace -m pytest tests/`. 모듈 이름 뒤의 인자는 모두 모듈에 전달되므로 pyftrace의 옵션은 `-m` 앞에 두어야 합니다.
+- `-m <module> [args ...]`: `python -m`처럼 모듈을 실행하며 추적합니다. 예: `pyftrace -m pytest tests/`. 모듈 이름 뒤의 인자는 모두 모듈에 전달되므로 pyftrace의 옵션은 `-m` 앞에 두어야 합니다. 표준 라이브러리 코드는 프로그램의 일부로 추적하지 않으므로 `json.tool` 같은 표준 라이브러리 모듈을 실행하면 `-v`를 주어도 트레이스가 비어 있습니다.
 - `--path` 또는 `-p`: 추적 출력에 파일 경로를 포함합니다.
 - `--help` 또는 `-h`: pyftrace 및 해당 옵션에 대한 도움말 정보를 표시합니다.
 - `--version` 또는 `-V`: pyftrace 버전을 출력합니다.
@@ -190,16 +190,15 @@ $ pyftrace examples/module_trace/main_script.py
 출력 결과:
 ```
 Running script: examples/module_trace/main_script.py
-Called main from line 10
-    Called function_a from line 5
+    Called main from line 10
+        Called function_a from line 5
 Function A is called.
-    Returning function_a-> ret_a
-    Called function_b from line 6
+        Returning function_a-> ret_a
+        Called function_b from line 6
 Function B is called.
-    Returning function_b-> ret_b
+        Returning function_b-> ret_b
 Results: ret_a, ret_b
-Returning main-> None
-Returning <module>-> None
+    Returning main-> None
 ```
 
 ### `--verbose`로 내장 함수 추적
@@ -211,22 +210,21 @@ $ pyftrace --verbose examples/module_trace/main_script.py
 출력 결과:
 ```
 Running script: examples/module_trace/main_script.py
-Called main from line 10
-    Called function_a from line 5
-        Called print from line 2
+    Called main from line 10
+        Called function_a from line 5
+            Called print from line 2
 Function A is called.
-        Returning print
-    Returning function_a-> ret_a
-    Called function_b from line 6
-        Called print from line 2
+            Returning print
+        Returning function_a-> ret_a
+        Called function_b from line 6
+            Called print from line 2
 Function B is called.
-        Returning print
-    Returning function_b-> ret_b
-    Called print from line 7
+            Returning print
+        Returning function_b-> ret_b
+        Called print from line 7
 Results: ret_a, ret_b
-    Returning print
-Returning main-> None
-Returning <module>-> None
+        Returning print
+    Returning main-> None
 ```
 
 ### `--path`로 파일 경로 추적
@@ -251,16 +249,15 @@ Called {function} @ {defined file path}:{defined line} from {called file path}:{
 출력 결과:
 ```
 Running script: examples/module_trace/main_script.py
-Called main@examples/module_trace/main_script.py:4 from examples/module_trace/main_script.py:10
-    Called function_a@examples/module_trace/module_a.py:1 from examples/module_trace/main_script.py:5
+    Called main@examples/module_trace/main_script.py:4 from examples/module_trace/main_script.py:10
+        Called function_a@examples/module_trace/module_a.py:1 from examples/module_trace/main_script.py:5
 Function A is called.
-    Returning function_a-> ret_a @ examples/module_trace/module_a.py
-    Called function_b@examples/module_trace/module_b.py:1 from examples/module_trace/main_script.py:6
+        Returning function_a-> ret_a @ examples/module_trace/module_a.py
+        Called function_b@examples/module_trace/module_b.py:1 from examples/module_trace/main_script.py:6
 Function B is called.
-    Returning function_b-> ret_b @ examples/module_trace/module_b.py
+        Returning function_b-> ret_b @ examples/module_trace/module_b.py
 Results: ret_a, ret_b
-Returning main-> None @ examples/module_trace/main_script.py
-Returning <module>-> None @ examples/module_trace/main_script.py
+    Returning main-> None @ examples/module_trace/main_script.py
 ```
 
 ### 실행 보고서 생성
@@ -297,22 +294,21 @@ $ pyftrace -vp examples/module_trace/main_script.py
 출력 결과:
 ```
 Running script: examples/module_trace/main_script.py
-Called main@examples/module_trace/main_script.py:4 from examples/module_trace/main_script.py:10
-    Called function_a@examples/module_trace/module_a.py:1 from examples/module_trace/main_script.py:5
-        Called print@builtins from examples/module_trace/module_a.py:2
+    Called main@examples/module_trace/main_script.py:4 from examples/module_trace/main_script.py:10
+        Called function_a@examples/module_trace/module_a.py:1 from examples/module_trace/main_script.py:5
+            Called print@builtins from examples/module_trace/module_a.py:2
 Function A is called.
-        Returning print @ examples/module_trace/module_a.py
-    Returning function_a-> ret_a @ examples/module_trace/module_a.py
-    Called function_b@examples/module_trace/module_b.py:1 from examples/module_trace/main_script.py:6
-        Called print@builtins from examples/module_trace/module_b.py:2
+            Returning print @ examples/module_trace/module_a.py
+        Returning function_a-> ret_a @ examples/module_trace/module_a.py
+        Called function_b@examples/module_trace/module_b.py:1 from examples/module_trace/main_script.py:6
+            Called print@builtins from examples/module_trace/module_b.py:2
 Function B is called.
-        Returning print @ examples/module_trace/module_b.py
-    Returning function_b-> ret_b @ examples/module_trace/module_b.py
-    Called print@builtins from examples/module_trace/main_script.py:7
+            Returning print @ examples/module_trace/module_b.py
+        Returning function_b-> ret_b @ examples/module_trace/module_b.py
+        Called print@builtins from examples/module_trace/main_script.py:7
 Results: ret_a, ret_b
-    Returning print @ examples/module_trace/main_script.py
-Returning main-> None @ examples/module_trace/main_script.py
-Returning <module>-> None @ examples/module_trace/main_script.py
+        Returning print @ examples/module_trace/main_script.py
+    Returning main-> None @ examples/module_trace/main_script.py
 ```
 
 ### `--verbose`와 `--report` 결합
