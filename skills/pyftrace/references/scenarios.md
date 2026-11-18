@@ -111,6 +111,14 @@ Each trace line is flushed as it is written.  When the interpreter dies
 of a segmentation fault or is killed, the last line of the trace is the
 last call that started.
 
+## Programs that profile or trace themselves
+
+On Python 3.12 or later a program can run cProfile, coverage or a
+debugger while it is traced.  On Python 3.8 to 3.11 pyftrace uses the
+profiling hook of the interpreter, and a program that takes the hook
+for itself (`cProfile`, `sys.setprofile`) and does not give it back
+ends the trace at that point.
+
 ## Large or slow programs
 
 Tracing adds work to every call.  The default trace skips library code
