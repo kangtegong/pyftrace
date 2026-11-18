@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [0.4.1] - 2026-11-19
 
 ### Added
 - A call made from library code names the module of its line: `Called worker from line 1012 in threading`, and `caller_module` in JSON.
