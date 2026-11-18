@@ -78,6 +78,31 @@ $ pip install pyftrace
 
 > note: 윈도우에서는 windows-curses 설치 필요
 
+### AI 코딩 에이전트와 함께 쓰기
+
+pyftrace에는 코딩 에이전트가 프로그램을 언제, 어떻게 추적할지 알려 주는
+스킬이 들어 있습니다. 출력을 짧게 유지하는 법, 출력을 읽는 법, 어떤
+질문에 어떤 옵션을 쓰는지를 다룹니다.
+
+Claude Code에서는 스킬을 플러그인으로 설치합니다. 세션의 프롬프트에서:
+
+```
+/plugin install pyftrace --marketplace kangtegong/pyftrace
+```
+
+또는 셸에서:
+
+```
+$ claude plugin install pyftrace --marketplace kangtegong/pyftrace
+```
+
+다른 에이전트는 [skills/pyftrace/SKILL.md](skills/pyftrace/SKILL.md)를
+그대로 읽으면 됩니다. 에이전트가 스킬이나 지침을 찾는 위치에 복사해
+두세요.
+
+플러그인은 스킬만 설치합니다. 프로젝트가 실행되는 환경에 `pyftrace`
+명령(0.4.0 이상)이 따로 있어야 합니다: `pip install -U pyftrace`.
+
 
 ### 기본 옵션
 
