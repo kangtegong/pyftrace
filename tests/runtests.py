@@ -1159,6 +1159,19 @@ class OptionTests(PyftraceTestCase):
         self.assertRegex(stdout, r"wait\s+\|\s+\d+\.\d+ seconds\s+\|\s+1")
         self.assertEqual(-signal.SIGINT, process.returncode)
 
+    @unittest.skipUnless(sys.platform == "win32", "Windows only")
+    def test_interrupt_exit_code_on_windows(self):
+        """
+        An interrupted program ends with the exit code python gives it on
+        Windows, STATUS_CONTROL_C_EXIT, not with the 130 of a shell.
+        """
+        result = subprocess.run(
+            [self.python_executable, '-c',
+             'from pyftrace.main import die_of_interrupt; die_of_interrupt()'],
+            cwd=self.project_root,
+            env=dict(os.environ, PYTHONPATH=self.python_path()))
+        self.assertEqual(0xC000013A, result.returncode & 0xFFFFFFFF)
+
     def test_syntax_error_of_program(self):
         """
         A script that does not compile is reported like python does.

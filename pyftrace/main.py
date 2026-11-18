@@ -90,7 +90,8 @@ def die_of_interrupt():
     sys.stdout.flush()
     sys.stderr.flush()
     if sys.platform == "win32":
-        sys.exit(130)
+        # STATUS_CONTROL_C_EXIT, 0xC000013A, as a signed 32-bit number
+        sys.exit(-1073741510)
     signal.signal(signal.SIGINT, signal.SIG_DFL)
     os.kill(os.getpid(), signal.SIGINT)
 
