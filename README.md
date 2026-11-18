@@ -102,6 +102,11 @@ or from a shell:
 $ claude plugin install pyftrace --marketplace kangtegong/pyftrace
 ```
 
+`/plugin` exists only in Claude Code in a terminal.  In the VS Code
+extension and other places where it answers "/plugin isn't available in
+this environment", use the shell command; the skill is picked up by the
+sessions started after it.
+
 Other agents can read [skills/pyftrace/SKILL.md](skills/pyftrace/SKILL.md)
 directly; copy it to wherever the agent looks for skills or
 instructions.
