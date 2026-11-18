@@ -1,5 +1,35 @@
 # Changelog
 
+## [0.4.0] - 2026-11-18
+
+### Added
+- Options that bound and shape the trace:
+  - `-n`/`--max-lines`: stop printing after a number of lines.
+  - `-c`/`--collapse`: print repeated calls once, with a repeat count.
+  - `-F`/`--file`, `-E`/`--exclude-file`: trace only, or leave out, the functions of a file, directory, glob or module.
+  - `--format json`: one JSON object per trace event.
+  - `-m MODULE`: run and trace a module, like `python -m`.
+- Raised exceptions appear in the trace as `Raised` lines.
+- Threads and child processes are traced; their lines are marked with `[tid N]` and `[pid N]`.
+- A skill for AI coding agents (`skills/pyftrace/SKILL.md`) and Claude Code plugin files to install it.
+- New examples: Django, PyTorch, threads, processes, exceptions, loops, callbacks and generators.
+- Tests for the options, the TUI and the examples.
+
+### Changed
+- `-f`/`--function` and `-e`/`--exclude-function` can be repeated.
+- `-o`/`--output` writes the trace only to the file; the traced program's own output stays on the terminal.
+- Class and module bodies are no longer shown as calls.
+- Arguments and return values are cut to one line of at most 200 characters.
+- Library code is skipped much more cheaply, so programs that use large libraries run far faster under pyftrace.
+- The package no longer installs a top-level `tests` package.
+
+### Fixed
+- Quitting the TUI on Linux ended with a traceback.
+- CI and the release workflow run on current GitHub runners again.
+
+---
+
+
 ## [0.3.1] - 2024-12-23
 
 ### Added
