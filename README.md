@@ -83,6 +83,33 @@ $ pip install pyftrace
 
 > note: on Windows, windows-curses is required.
 
+### Use with AI Coding Agents
+
+pyftrace ships a skill that teaches a coding agent when and how to trace
+a program: how to keep the output short, how to read it, and which
+options answer which question.
+
+For Claude Code, install the skill as a plugin.  At the prompt of a
+session:
+
+```
+/plugin install pyftrace --marketplace kangtegong/pyftrace
+```
+
+or from a shell:
+
+```
+$ claude plugin install pyftrace --marketplace kangtegong/pyftrace
+```
+
+Other agents can read [skills/pyftrace/SKILL.md](skills/pyftrace/SKILL.md)
+directly; copy it to wherever the agent looks for skills or
+instructions.
+
+The plugin installs only the skill.  The agent still needs the
+`pyftrace` command (0.4.0 or later) in the environment the project
+runs in: `pip install -U pyftrace`.
+
 
 ### Command-Line Options
 
