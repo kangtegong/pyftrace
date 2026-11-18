@@ -32,6 +32,7 @@ def main():
         sys.exit(1)
 
     parser = argparse.ArgumentParser(
+        prog="pyftrace",
         usage="%(prog)s [options] [tui] (script | -m module) [args ...]",
         description="pyftrace: Python function tracing tool.",
         formatter_class=argparse.RawTextHelpFormatter

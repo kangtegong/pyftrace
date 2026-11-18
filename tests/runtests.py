@@ -160,6 +160,20 @@ class PyftraceTests(PyftraceTestCase):
         self.assertIn(expected_output, result.stdout)
         self.assertEqual(result.returncode, 0)
 
+    def test_run_as_package(self):
+        """
+        'python -m pyftrace' is the same command as 'pyftrace', run by
+        an interpreter of the caller's choice.
+        """
+        cmd = [self.python_executable, '-m', 'pyftrace', self.foobar_script]
+        result = subprocess.run(cmd, stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE, cwd=self.project_root,
+                                universal_newlines=True)
+
+        self.assertIn("Called foo", result.stdout)
+        self.assertNotIn("Called main", result.stdout)
+        self.assertEqual(result.returncode, 0)
+
     def test_help_option_short_h(self):
         """
         Test '-h' flag for help message.
