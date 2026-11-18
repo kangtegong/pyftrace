@@ -7,8 +7,11 @@ import tempfile
 try:
     import fcntl
 except ImportError:
-    # Windows.  The count of several processes is not exact there.
     fcntl = None
+try:
+    import msvcrt
+except ImportError:
+    msvcrt = None
 
 INDENT = "    "
 
@@ -103,13 +106,32 @@ class LineCounter:
         """
         Count one more line and return its number.
         """
-        if fcntl is None:
-            return self.increment()
-        fcntl.lockf(self.fd, fcntl.LOCK_EX)
+        self.lock()
         try:
             return self.increment()
         finally:
+            self.unlock()
+
+    def lock(self):
+        if fcntl is not None:
+            fcntl.lockf(self.fd, fcntl.LOCK_EX)
+        elif msvcrt is not None:
+            # Windows locks the bytes that follow the position of the file
+            os.lseek(self.fd, 0, os.SEEK_SET)
+            while True:
+                try:
+                    msvcrt.locking(self.fd, msvcrt.LK_LOCK, self.map.size())
+                    return
+                except OSError:
+                    # LK_LOCK gives up after ten seconds of waiting
+                    pass
+
+    def unlock(self):
+        if fcntl is not None:
             fcntl.lockf(self.fd, fcntl.LOCK_UN)
+        elif msvcrt is not None:
+            os.lseek(self.fd, 0, os.SEEK_SET)
+            msvcrt.locking(self.fd, msvcrt.LK_UNLCK, self.map.size())
 
     def increment(self):
         value = self.value + 1
