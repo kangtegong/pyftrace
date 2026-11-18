@@ -72,7 +72,8 @@ class PyftraceMonitoring(PyftraceBase):
         self.handle_py_start_event(code, sys._getframe(1))
 
     def monitor_call(self, code, instruction_offset, callable_obj, arg0):
-        self.handle_call_event(code, instruction_offset, callable_obj)
+        self.handle_call_event(code, instruction_offset, callable_obj,
+                               sys._getframe(1))
 
     def monitor_py_return(self, code, instruction_offset, retval):
         return self.handle_py_return_event(code, instruction_offset, retval)
@@ -153,6 +154,9 @@ class PyftraceMonitoring(PyftraceBase):
             call_filename = os.path.abspath(call_filename)
 
         trace_this = self.is_traceable_file(def_filename)
+        if (trace_this and self.verbose and self.is_site_code(def_filename)
+                and self.run_by_import_system(caller)):
+            trace_this = False
 
         arguments = ""
         if self.trace_arguments and trace_this:
@@ -162,7 +166,8 @@ class PyftraceMonitoring(PyftraceBase):
         self.trace_call(func_name, False, trace_this, def_location,
                         call_filename, call_lineno, arguments)
 
-    def handle_call_event(self, code, instruction_offset, callable_obj):
+    def handle_call_event(self, code, instruction_offset, callable_obj,
+                          frame=None):
         if not self.tracing_started:
             return
 
@@ -194,6 +199,11 @@ class PyftraceMonitoring(PyftraceBase):
         else:
             if self.verbose and self.should_trace(def_filename):
                 trace_this = True
+
+        if (trace_this and frame is not None
+                and self.is_site_code(call_filename)
+                and self.run_by_import_system(frame)):
+            trace_this = False
 
         # A function without a source file belongs to the file calling it
         trace_this = trace_this and self.file_selected(call_filename)

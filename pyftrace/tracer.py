@@ -9,7 +9,7 @@ import threading
 import time
 from abc import ABC, abstractmethod
 from .utils import find_import_end_line, find_module_file
-from .utils import format_exception, safe_str
+from .utils import format_exception, safe_str, is_function_code
 from .utils import path_matches, is_closed_pipe
 from .output import Collapser, LineCounter, format_text
 from . import multiproc
@@ -521,6 +521,39 @@ class PyftraceBase(ABC):
         if path_matches(path, self.file_exclude):
             return False
         return not self.file_filter or path_matches(path, self.file_filter)
+
+    @staticmethod
+    def is_import_system(code):
+        """
+        True for the code of importlib that finds and loads modules.  It
+        is frozen into the interpreter, unless Python runs with
+        -X frozen_modules=off.
+        """
+        file_name = code.co_filename
+        if file_name.startswith('<frozen importlib._bootstrap'):
+            return True
+        directory, base = os.path.split(file_name)
+        return (os.path.basename(directory) == 'importlib'
+                and base in ('_bootstrap.py', '_bootstrap_external.py'))
+
+    def run_by_import_system(self, frame):
+        """
+        True if the import system called frame, or the library functions
+        that frame was called from: the finders and loaders a library
+        adds to it, such as the one of setuptools in every program.
+        Neither the program nor the library it calls asked for these.
+        The body of a module they load is not a function, and what it
+        calls is shown as usual.
+        """
+        while frame is not None:
+            code = frame.f_code
+            if self.is_import_system(code):
+                return True
+            if (not is_function_code(code)
+                    or not self.is_site_code(code.co_filename)):
+                return False
+            frame = frame.f_back
+        return False
 
     @staticmethod
     def is_pseudo_file(file_name):

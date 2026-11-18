@@ -132,6 +132,27 @@ class PyftraceSetprofile(PyftraceBase):
             return
         self.ignored_codes.add(code)
 
+    def c_function_traced(self, frame, func):
+        """
+        Whether a C function that frame calls is traced: a built-in
+        when the code calling it is, another one when the module that
+        defines it is.  The same answer is needed for its return.
+        """
+        if not self.verbose:
+            return False
+        module_name = getattr(func, '__module__', None)
+        if module_name in (None, 'builtins'):
+            caller = resolve_filename(frame.f_code, None)
+            if not caller:
+                return False
+            caller = os.path.abspath(caller)
+            if not self.should_trace(caller):
+                return False
+            return not (self.is_site_code(caller)
+                        and self.run_by_import_system(frame))
+        defined_in = resolve_filename(None, func)
+        return bool(defined_in) and self.should_trace(os.path.abspath(defined_in))
+
     def handle_call_event(self, frame, arg, is_c_call=False):
         if is_c_call:
             func_name = callable_name(arg)
@@ -178,24 +199,21 @@ class PyftraceSetprofile(PyftraceBase):
             self.ignore_code(code, filename)
             return
 
-        trace_this = False
-
+        # The standard library is left out, with --verbose too
         if self.is_stdlib_code(filename):
-            if not self.verbose:
-                self.ignore_code(code, filename)
-                return
-            trace_this = True
+            self.ignore_code(code, filename)
+            return
+
+        # A library function that the import system runs is left out,
+        # but only this time: the program may call it too
+        run_for_import = False
+        if is_c_call:
+            trace_this = self.c_function_traced(frame, arg)
         else:
-            if filename is None:
-                # filename is None: C-extension or similar. If verbose, trace anyway.
-                if self.verbose:
-                    trace_this = True
-            else:
-                # Normal logic for user-defined or third-party code
-                if self.should_trace(filename):
-                    trace_this = True
-                elif self.verbose and module_name == 'builtins':
-                    trace_this = True
+            trace_this = self.should_trace(filename)
+            run_for_import = (trace_this and self.verbose
+                              and self.is_site_code(filename)
+                              and self.run_by_import_system(caller_frame))
 
         # For a C function, frame is the caller: it belongs to that file
         owner = filename or frame.f_code.co_filename
@@ -203,6 +221,8 @@ class PyftraceSetprofile(PyftraceBase):
 
         if not trace_this and func_name not in self.function_exclude:
             self.ignore_code(code, filename)
+        if run_for_import:
+            trace_this = False
 
         if self.function_exclude and func_name in self.function_exclude:
             self.exclude_depth += 1
@@ -279,23 +299,13 @@ class PyftraceSetprofile(PyftraceBase):
                 self.exclude_depth -= 1
             return
 
-        trace_this = False
-
         if self.is_stdlib_code(filename):
-            if not self.verbose:
-                return
-            trace_this = True
+            return
+
+        if is_c_return:
+            trace_this = self.c_function_traced(frame, arg)
         else:
-            if filename is None:
-                if self.verbose and self.call_stack and self.call_stack[-1] == func_name:
-                    trace_this = True
-            else:
-                if self.call_stack and self.call_stack[-1] == func_name:
-                    trace_this = True
-                else:
-                    if self.verbose and module_name == 'builtins':
-                        if self.call_stack and self.call_stack[-1] == func_name:
-                            trace_this = True
+            trace_this = self.should_trace(filename)
 
         owner = filename or frame.f_code.co_filename
         trace_this = trace_this and self.file_selected(owner)

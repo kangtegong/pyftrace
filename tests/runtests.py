@@ -1421,6 +1421,29 @@ class RegressionTests(PyftraceTestCase):
             "    Returning name_of-> b.txt",
         ], self.trace_lines(result.stdout))
 
+    def test_verbose_leaves_out_standard_library(self):
+        """
+        -v adds built-ins and installed packages, not the standard
+        library, on every version of Python.  Before, Python 3.8 to 3.11
+        traced it, the import system included.
+        """
+        result = self.run_source("""
+            import json
+
+            def main():
+                import csv
+                return len(json.dumps([1]))
+
+            main()
+        """, args=['-v'])
+
+        self.assertEqual([
+            "    Called main from line 8",
+            "        Called len from line 6",
+            "        Returning len",
+            "    Returning main-> 3",
+        ], self.trace_lines(result.stdout))
+
     def test_class_body_not_traced(self):
         """
         Test that defining a class is not shown as a call.
@@ -1653,6 +1676,46 @@ class LibraryCodeTests(unittest.TestCase):
         finally:
             site.getsitepackages = original
         self.assertFalse(tracer.should_trace(os.__file__))
+
+    def test_run_by_import_system(self):
+        """
+        A finder that a library adds to the import system, and what it
+        calls, run for the import system.  The same function called by
+        the program, and the body of a module, do not.
+        """
+        site_dir = os.path.join(tempfile.gettempdir(), "pyftrace-site")
+        self.verbose_tracer.site_dirs = self.verbose_tracer.normalize_dirs(
+            [site_dir])
+        frames = {}
+        namespace = {"frames": frames, "sys": sys}
+
+        def define(source, file_name):
+            exec(compile(textwrap.dedent(source), file_name, "exec"),
+                 namespace)
+
+        define("""
+            def hook():
+                frames["hook"] = sys._getframe()
+            def finder():
+                hook()
+        """, os.path.join(site_dir, "library.py"))
+        define("""
+            def find_spec():
+                finder()
+        """, "<frozen importlib._bootstrap>")
+        define("""
+            def program():
+                finder()
+        """, os.path.join(self.project_root, "program.py"))
+        define("""
+            frames["body"] = sys._getframe()
+        """, os.path.join(site_dir, "module.py"))
+
+        namespace["find_spec"]()
+        self.assertTrue(self.verbose_tracer.run_by_import_system(frames["hook"]))
+        namespace["program"]()
+        self.assertFalse(self.verbose_tracer.run_by_import_system(frames["hook"]))
+        self.assertFalse(self.verbose_tracer.run_by_import_system(frames["body"]))
 
     def test_site_packages(self):
         module = os.path.join(sysconfig.get_paths()["purelib"],

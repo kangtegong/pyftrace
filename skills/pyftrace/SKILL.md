@@ -124,7 +124,7 @@ it.
 | --- | --- |
 | `-a` | Show the arguments of every call. |
 | `-p` | Show the file and line where each function is defined and called from.  Use it when names are ambiguous or you need to open the code. |
-| `-v` | Trace built-ins, the standard library and installed packages too.  Far more output and slower; pair it with `-F`, `-f`, `-d` or `-n`. |
+| `-v` | Trace built-ins and installed packages too, not the standard library.  Far more output and slower; pair it with `-F`, `-f`, `-d` or `-n`. |
 | `-r` | Print no trace.  Print total time and call count per function when the program ends. |
 | `--format json` | One JSON object per line.  For traces a script will process. |
 
