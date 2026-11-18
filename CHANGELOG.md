@@ -12,6 +12,7 @@
 ### Fixed
 - On Windows, `pyftrace ... | head` still raised an error inside the traced program, since Windows reports a closed pipe as `EINVAL`.
 - On Windows, `--max-lines` was still overrun by a few lines when several processes printed at once.
+- On Windows, `--max-lines` left a `pyftrace-lines-*` file in the temporary directory with every run.
 - On Windows, outside a virtual environment, `-v` traced the standard library as if it were third-party code.
 - `-v` showed the finders that installed packages add to the import system, such as the one of setuptools, before every import.
 - On Python 3.8 to 3.11, what a script ran before its last import line was not traced: a decorator applied while a module of the program was imported, a setup call between two imports.
