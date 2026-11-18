@@ -14,6 +14,7 @@
 | --- | --- |
 | `Running script: PATH` / `Running module: NAME` | Header, printed once. |
 | `Called f from line N` | `f` was called from line N of the calling function's file. |
+| `Called f from line N in MODULE` | The call came from line N of a library module, such as `threading` for the function a thread runs or the request handler of a framework for a view. |
 | `Called f (a=1, b='x') from line N` | The same with `-a`. |
 | `Called f@FILE:DEF from CALLER:N` | The same with `-p`: where `f` is defined and where the call is. |
 | `Returning f-> VALUE` | `f` returned VALUE. |
@@ -83,7 +84,7 @@ With `--format json` every line is one object.
 | `event` | Fields |
 | --- | --- |
 | `start` | `script` or `module` |
-| `call` | `depth`, `function`, `line` (of the call site); with `-a`: `args`; with `-p`: `defined_at` (`FILE:LINE`), `caller_file` |
+| `call` | `depth`, `function`, `line` (of the call site); `caller_module` when the call site is in a library; with `-a`: `args`; with `-p`: `defined_at` (`FILE:LINE`), `caller_file` |
 | `return` | `depth`, `function`, `value` (absent for built-ins); with `-p`: `file` |
 | `raise` | `depth`, `function`, `exception` (Python 3.12 or later); with `-p`: `file` |
 | `repeat` | `depth`, `count` |

@@ -21,7 +21,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 from pyftrace import __version__ as pyftrace_version
 from pyftrace.output import Collapser
 from pyftrace.tracer import get_tracer
-from pyftrace.utils import normalize_patterns
+from pyftrace.utils import normalize_patterns, module_name_of
 
 class PyftraceTestCase(unittest.TestCase):
     @classmethod
@@ -602,7 +602,7 @@ Results: ret_a, ret_b
 
         expected_output = f"""Running script: {self.threads_script}
     Called main from line 15
-[tid N]     Called worker from line N
+[tid N]     Called worker from line N in threading
 [tid N]         Called square from line 7
 [tid N]         Returning square-> 9
 [tid N]     Returning worker-> 9
@@ -629,7 +629,7 @@ Results: ret_a, ret_b
 
         expected_output = f"""Running script: {self.processes_script}
     Called main from line 16
-[pid N]     Called worker from line N
+[pid N]     Called worker from line N in multiprocessing.process
 [pid N]         Called square from line 7
 [pid N]         Returning square-> 9
 [pid N]     Returning worker-> 9
@@ -662,7 +662,7 @@ Results: ret_a, ret_b
 
         expected_output = f"""Running script: {self.processes_script}
     Called main from line 16
-[pid N]     Called worker from line N
+[pid N]     Called worker from line N in multiprocessing.process
 [pid N]         Called square from line 7
 ... trace truncated after 3 lines"""
 
@@ -1407,7 +1407,8 @@ class RegressionTests(PyftraceTestCase):
             "        Returning helper-> handled",
             "    Returning main-> handled",
         ], lines[-3:])
-        self.assertRegex(lines[-4], r"^    Called main from line \d+$")
+        # The event loop runs it
+        self.assertRegex(lines[-4], r"^    Called main from line \d+ in asyncio\.\w+$")
 
     def test_library_code_not_traced(self):
         """
@@ -1518,6 +1519,34 @@ class RegressionTests(PyftraceTestCase):
         self.assertEqual(0, result.returncode, result.stderr)
         events = [json.loads(line) for line in result.stdout.splitlines()]
         self.assertEqual("ok \U0001F600", events[-1]["value"])
+
+    def test_caller_in_library(self):
+        """
+        A call made from library code names the module whose line it
+        is: the line of threading that runs a thread is not one of the
+        program.
+        """
+        source = """
+            import threading
+
+            def work():
+                return 1
+
+            thread = threading.Thread(target=work)
+            thread.start()
+            thread.join()
+            work()
+        """
+        result = self.run_source(source)
+        lines = self.trace_lines(result.stdout)
+        self.assertRegex(lines[0], r"^\[tid N\]     Called work from line \d+ in threading$")
+        self.assertEqual("    Called work from line 10", lines[2])
+
+        result = self.run_source(source, args=['--format', 'json'])
+        calls = [json.loads(line) for line in result.stdout.splitlines()
+                 if '"call"' in line]
+        self.assertEqual("threading", calls[0]["caller_module"])
+        self.assertNotIn("caller_module", calls[1])
 
     def test_verbose_leaves_out_standard_library(self):
         """
@@ -1681,7 +1710,7 @@ class RegressionTests(PyftraceTestCase):
             except ValueError:
                 pass
         """)
-        lines = [re.sub(r" from line \d+", "", line).strip()
+        lines = [re.sub(r" from line \d+( in [\w.]+)?", "", line).strip()
                  for line in self.trace_lines(result.stdout)]
 
         self.assertEqual([
@@ -1814,6 +1843,15 @@ class LibraryCodeTests(unittest.TestCase):
         namespace["program"]()
         self.assertFalse(self.verbose_tracer.run_by_import_system(frames["hook"]))
         self.assertFalse(self.verbose_tracer.run_by_import_system(frames["body"]))
+
+    def test_module_name_of(self):
+        import json.decoder
+        import threading
+        self.assertEqual("threading", module_name_of(threading.__file__))
+        self.assertEqual("json.decoder", module_name_of(json.decoder.__file__))
+        self.assertEqual("json", module_name_of(json.__file__))
+        self.assertEqual("importlib._bootstrap",
+                         module_name_of("<frozen importlib._bootstrap>"))
 
     def test_site_packages(self):
         module = os.path.join(sysconfig.get_paths()["purelib"],
@@ -1948,7 +1986,7 @@ class ConcurrencyTests(PyftraceTestCase):
 
             threading.Thread(target=late).start()
         """)
-        lines = [re.sub(r" from line \d+", "", line)
+        lines = [re.sub(r" from line \d+( in [\w.]+)?", "", line)
                  for line in self.trace_lines(result.stdout)]
 
         self.assertEqual([
@@ -2026,7 +2064,7 @@ class ConcurrencyTests(PyftraceTestCase):
         Test that the function a multiprocessing pool runs is traced.
         """
         result = self.run_source(self.POOL_SCRIPT)
-        lines = [re.sub(r" from line \d+", "", line)
+        lines = [re.sub(r" from line \d+( in [\w.]+)?", "", line)
                  for line in self.trace_lines(result.stdout)]
 
         self.assertEqual(3, lines.count("[pid N]     Called square"))

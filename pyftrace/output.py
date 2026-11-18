@@ -36,6 +36,8 @@ def format_text(event):
             function = f"{function}@{event['defined_at']}"
         if "caller_file" in event:
             caller = f"from {event['caller_file']}:{event['line']}"
+        elif "caller_module" in event:
+            caller = f"{caller} in {event['caller_module']}"
         if "args" in event:
             function = f"{function} ({event['args']})"
         return f"{indent}Called {function} {caller}"

@@ -148,7 +148,8 @@ passed the value on.
 
 - Indentation is call depth.
 - `Called f (args) from line N`: `f` was called from line N of its
-  caller.  The arguments appear with `-a`.
+  caller.  The arguments appear with `-a`.  `from line N in MODULE`
+  means the caller is library code, such as `threading` or a framework.
 - `Returning f-> value`: what `f` returned, cut to one line of at most
   200 characters.
 - `Raised f-> Error: message`: an exception left `f`.  The deepest

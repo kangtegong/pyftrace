@@ -10,7 +10,7 @@ import time
 from abc import ABC, abstractmethod
 from .utils import find_module_file
 from .utils import format_exception, safe_str, is_function_code
-from .utils import path_matches, is_closed_pipe
+from .utils import path_matches, is_closed_pipe, module_name_of
 from .output import Collapser, LineCounter, format_text
 from . import multiproc
 
@@ -90,6 +90,9 @@ class PyftraceBase(ABC):
         # Normalized paths given with -F and -E
         self.file_filter = ()
         self.file_exclude = ()
+
+        # The module of each library file that calls into the program
+        self.caller_modules = {}
 
     @property
     def thread_state(self):
@@ -409,6 +412,10 @@ class PyftraceBase(ABC):
             event["defined_at"] = def_location
         if self.show_path and call_file and call_line:
             event["caller_file"] = call_file
+        # A line number of a library reads like one of the program.  Say
+        # whose it is, as for a thread started by threading.
+        if call_file and call_line and self.is_library_code(call_file):
+            event["caller_module"] = self.caller_module(call_file)
         if arguments:
             event["args"] = arguments
 
@@ -533,6 +540,16 @@ class PyftraceBase(ABC):
         if path_matches(path, self.file_exclude):
             return False
         return not self.file_filter or path_matches(path, self.file_filter)
+
+    def is_library_code(self, file_name):
+        return self.is_stdlib_code(file_name) or self.is_site_code(file_name)
+
+    def caller_module(self, file_name):
+        try:
+            return self.caller_modules[file_name]
+        except KeyError:
+            name = self.caller_modules[file_name] = module_name_of(file_name)
+            return name
 
     @staticmethod
     def is_import_system(code):

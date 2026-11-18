@@ -346,10 +346,10 @@ $ pip install django
 $ pyftrace examples/django_example.py
 Running script: examples/django_example.py
     Called main from line 83
-        Called __init__ from line 63
+        Called __init__ from line 63 in django.core.handlers.base
         Returning __init__-> None
-        Called __call__ from line 56
-            Called article_list from line 199
+        Called __call__ from line 56 in django.core.handlers.exception
+            Called article_list from line 199 in django.core.handlers.base
                 Called serialize from line 45
                 Returning serialize-> {'id': 1, 'title': 'Tracing Python'}
                 Called serialize from line 45
@@ -358,8 +358,8 @@ Running script: examples/django_example.py
         Returning __call__-> <JsonResponse status_code=200, "application/json">
 GET /articles/ -> 200
 ...
-        Called __call__ from line 56
-            Called article_detail from line 199
+        Called __call__ from line 56 in django.core.handlers.exception
+            Called article_detail from line 199 in django.core.handlers.base
                 Called find_article from line 49
                 Raised find_article-> Http404: No article 99
             Raised article_detail-> Http404: No article 99

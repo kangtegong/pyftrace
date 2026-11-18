@@ -109,6 +109,30 @@ def get_line_number(code, instruction_offset):
             return lineno
     return code.co_firstlineno
 
+def module_name_of(file_name):
+    """
+    The name a file is imported by, found from the entries of sys.path:
+    'threading' for .../Lib/threading.py.
+    """
+    if file_name.startswith('<frozen ') and file_name.endswith('>'):
+        return file_name[len('<frozen '):-1]
+    path = os.path.abspath(file_name)
+    normalized = os.path.normcase(path)
+    root = None
+    for entry in sys.path:
+        if not entry:
+            continue
+        entry = os.path.join(os.path.normcase(os.path.abspath(entry)), '')
+        if normalized.startswith(entry) and (root is None
+                                             or len(entry) > len(root)):
+            root = entry
+    if root is None:
+        return os.path.splitext(os.path.basename(path))[0]
+    parts = os.path.splitext(path[len(root):])[0].split(os.sep)
+    if len(parts) > 1 and parts[-1] == '__init__':
+        parts.pop()
+    return '.'.join(parts)
+
 def module_paths(name):
     """
     Return the file of a module or the directories of a package, or
