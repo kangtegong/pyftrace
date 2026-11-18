@@ -10,7 +10,7 @@ def run_tui(trace_file_path):
         print(f"Trace file '{trace_file_path}' does not exist.")
         sys.exit(1)
 
-    with open(trace_file_path, 'r') as f:
+    with open(trace_file_path, 'r', encoding='utf-8') as f:
         trace_lines = f.readlines()
 
     curses.wrapper(tui_main, trace_lines)

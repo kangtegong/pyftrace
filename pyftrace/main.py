@@ -182,7 +182,9 @@ def main():
                 temp_file_path = temp_file.name
 
             try:
-                with open(temp_file_path, "a", buffering=1) as f:
+                # Child processes write to the file in UTF-8 too
+                with open(temp_file_path, "a", buffering=1,
+                          encoding="utf-8") as f:
                     tracer = get_tracer(
                         verbose=args.verbose,
                         show_path=args.path,

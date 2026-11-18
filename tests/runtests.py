@@ -1,4 +1,5 @@
 import unittest
+import unittest.mock
 import subprocess
 import sys
 import os
@@ -1478,6 +1479,34 @@ class RegressionTests(PyftraceTestCase):
         """, args=['-o', os.devnull])
 
         self.assertEqual(0, result.returncode, result.stderr)
+
+    def test_value_the_output_cannot_encode(self):
+        """
+        A value that the encoding of the output cannot hold is written
+        as escapes.  It killed the program, as an emoji did on a Korean
+        Windows.
+        """
+        with unittest.mock.patch.dict(os.environ, PYTHONIOENCODING="ascii"):
+            result = self.run_source("""
+                def mood():
+                    return "ok \\U0001F600"
+
+                mood()
+                print("done")
+            """, args=['-r'])
+            self.assertEqual(0, result.returncode, result.stderr)
+            self.assertIn("done", result.stdout)
+
+            result = self.run_source("""
+                def mood():
+                    return "ok \\U0001F600"
+
+                mood()
+            """)
+
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertIn("    Returning mood-> ok \\U0001f600",
+                      self.trace_lines(result.stdout))
 
     def test_verbose_leaves_out_standard_library(self):
         """
