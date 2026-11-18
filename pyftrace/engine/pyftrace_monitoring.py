@@ -14,8 +14,19 @@ class PyftraceMonitoring(PyftraceBase):
     def __init__(self, verbose, show_path, report_mode, output_stream, function_filter=None, function_exclude=None, trace_arguments=False):
         super().__init__(verbose, show_path, report_mode, output_stream, function_filter, function_exclude, trace_arguments)
 
+    # Ids 0 to 2 and 5 are those of debuggers, coverage tools, profilers
+    # and optimizers.  A traced program that uses one of them itself
+    # must find its id free.
+    TOOL_IDS = (3, 4, 5, 2, 1, 0)
+
+    def find_tool_id(self):
+        for tool_id in self.TOOL_IDS:
+            if sys.monitoring.get_tool(tool_id) is None:
+                return tool_id
+        raise RuntimeError("pyftrace: every sys.monitoring tool id is in use")
+
     def setup_tracing(self):
-        self.tool_id = 1
+        self.tool_id = self.find_tool_id()
         self.ignored_codes = {}
         sys.monitoring.use_tool_id(self.tool_id, "pyftrace")
         sys.monitoring.register_callback(self.tool_id, sys.monitoring.events.PY_START, self.monitor_py_start)

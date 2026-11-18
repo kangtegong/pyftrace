@@ -1132,6 +1132,29 @@ class RegressionTests(PyftraceTestCase):
     Programs that used to be traced wrongly, or broken by being traced.
     """
 
+    @unittest.skipUnless(hasattr(sys, "monitoring"), "needs sys.monitoring")
+    def test_program_measures_coverage(self):
+        """
+        A program that runs a coverage tool on sys.monitoring finds the
+        tool id of coverage tools free.
+        """
+        result = self.run_source("""
+            import sys
+
+            def work():
+                return 1
+
+            monitoring = sys.monitoring
+            monitoring.use_tool_id(monitoring.COVERAGE_ID, "coverage")
+            work()
+            monitoring.free_tool_id(monitoring.COVERAGE_ID)
+        """)
+
+        self.assertEqual("", result.stderr)
+        self.assertEqual(["    Called work from line 9",
+                          "    Returning work-> 1"],
+                         self.trace_lines(result.stdout))
+
     def test_generator_resumed_by_exception(self):
         """
         A generator that is resumed by throw() or close() is traced
