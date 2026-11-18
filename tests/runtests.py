@@ -121,7 +121,8 @@ class PyftraceTestCase(unittest.TestCase):
         directory = tempfile.mkdtemp(prefix="pyftrace-test-")
         self.addCleanup(shutil.rmtree, directory, True)
         self.script = os.path.join(directory, "script.py")
-        with open(self.script, "w") as f:
+        # Python reads source as UTF-8, whatever the locale
+        with open(self.script, "w", encoding="utf-8") as f:
             f.write(textwrap.dedent(source))
         return self.run_pyftrace(list(args) + [self.script] + list(script_args))
 
@@ -1430,6 +1431,53 @@ class RegressionTests(PyftraceTestCase):
             "    Called name_of from line 13",
             "    Returning name_of-> b.txt",
         ], self.trace_lines(result.stdout))
+
+    def test_import_time_calls(self):
+        """
+        What the script runs while it imports is traced on every version
+        of Python, a decorator included.  Python 3.8 to 3.11 started the
+        trace after the last import line of the script and missed it.
+        """
+        result = self.run_source("""
+            import json
+
+            def register(func):
+                return func
+
+            def setup():
+                return 1
+
+            CONFIG = setup()
+            import os
+
+            @register
+            def hello():
+                return "hi"
+
+            hello()
+        """)
+
+        lines = self.trace_lines(result.stdout)
+        self.assertIn("    Called setup from line 10", lines)
+        self.assertIn("    Returning setup-> 1", lines)
+        self.assertTrue(any(line.startswith("    Called register from line")
+                            for line in lines))
+        self.assertEqual("    Returning hello-> hi", lines[-1])
+
+    def test_script_not_in_ascii(self):
+        """
+        A script is read as Python reads it, not in the encoding of the
+        locale: pyftrace died on a UTF-8 script on a Korean Windows.
+        """
+        result = self.run_source("""
+            # 인사를 돌려준다
+            def hello():
+                return "안녕"
+
+            hello()
+        """, args=['-o', os.devnull])
+
+        self.assertEqual(0, result.returncode, result.stderr)
 
     def test_verbose_leaves_out_standard_library(self):
         """

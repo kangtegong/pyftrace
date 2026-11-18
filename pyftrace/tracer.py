@@ -8,7 +8,7 @@ import tempfile
 import threading
 import time
 from abc import ABC, abstractmethod
-from .utils import find_import_end_line, find_module_file
+from .utils import find_module_file
 from .utils import format_exception, safe_str, is_function_code
 from .utils import path_matches, is_closed_pipe
 from .output import Collapser, LineCounter, format_text
@@ -68,7 +68,6 @@ class PyftraceBase(ABC):
         self.verbose = verbose
         self.show_path = show_path
         self.output_stream = output_stream
-        self.import_end_line = 0
         self.max_depth = None
         self.max_lines = None
         # Turns a trace event into a line of output, see output.py
@@ -144,9 +143,6 @@ class PyftraceBase(ABC):
         """
         self.script_name = os.path.abspath(target_path)
         self.script_dir = os.path.dirname(self.script_name)
-
-        # The setprofile engine starts tracing after the imports
-        self.import_end_line = find_import_end_line(target_path)
 
         old_sys_path = sys.path.copy()
         old_sys_argv = sys.argv.copy()
@@ -229,7 +225,6 @@ class PyftraceBase(ABC):
                                       if self.line_counter else None),
                 "script_name": self.script_name,
                 "script_dir": self.script_dir,
-                "import_end_line": self.import_end_line,
             },
         }
 

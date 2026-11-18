@@ -178,21 +178,12 @@ class PyftraceSetprofile(PyftraceBase):
             return
 
         if not self.tracing_started:
-            start_tracing = False
-            if filename == self.script_name and code and frame.f_lineno > self.import_end_line:
-                start_tracing = True
-            else:
-                if caller_frame and caller_frame.f_code:
-                    caller_filename = resolve_filename(caller_frame.f_code, None)
-                    if caller_filename:
-                        caller_filename = os.path.abspath(caller_filename)
-                    if (caller_filename == self.script_name
-                        and caller_frame.f_lineno > self.import_end_line):
-                        start_tracing = True
-
-            if not start_tracing:
-                return
-            self.tracing_started = True
+            # Start tracing when the script's top-level code is entered,
+            # so that what its imports run is traced too
+            if (code is not None and code.co_name == '<module>'
+                    and filename == self.script_name):
+                self.tracing_started = True
+            return
 
         # Module and class bodies are not traced
         if code and not is_function_code(code):
