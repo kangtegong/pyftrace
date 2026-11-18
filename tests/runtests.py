@@ -1132,6 +1132,77 @@ class RegressionTests(PyftraceTestCase):
     Programs that used to be traced wrongly, or broken by being traced.
     """
 
+    def test_generator_resumed_by_exception(self):
+        """
+        A generator that is resumed by throw() or close() is traced
+        like one resumed by next().
+        """
+        result = self.run_source("""
+            def helper(tag):
+                return tag
+
+            def gen():
+                try:
+                    yield helper("first")
+                except ValueError:
+                    yield helper("recovered")
+                finally:
+                    helper("cleanup")
+
+            g = gen()
+            next(g)
+            g.throw(ValueError("x"))
+            g.close()
+        """)
+
+        lines = [line.split("->")[0] for line in self.trace_lines(result.stdout)]
+        self.assertEqual([
+            "    Called gen from line 14",
+            "        Called helper from line 7",
+            "        Returning helper",
+            "    Returning gen",
+            "    Called gen from line 15",
+            "        Called helper from line 9",
+            "        Returning helper",
+            "    Returning gen",
+            "    Called gen from line 16",
+            "        Called helper from line 11",
+            "        Returning helper",
+            "    Raised gen",
+        ], lines)
+
+    def test_coroutine_resumed_by_exception(self):
+        """
+        A coroutine whose await fails goes on in the trace: what it
+        does about the exception is the interesting part.
+        """
+        result = self.run_source("""
+            import asyncio
+
+            def helper(tag):
+                return tag
+
+            async def fail():
+                await asyncio.sleep(0)
+                raise KeyError("missing")
+
+            async def main():
+                try:
+                    await asyncio.ensure_future(fail())
+                except KeyError:
+                    return helper("handled")
+
+            asyncio.run(main())
+        """)
+
+        lines = self.trace_lines(result.stdout)
+        self.assertEqual([
+            "        Called helper from line 15",
+            "        Returning helper-> handled",
+            "    Returning main-> handled",
+        ], lines[-3:])
+        self.assertRegex(lines[-4], r"^    Called main from line \d+$")
+
     def test_library_code_not_traced(self):
         """
         Test that standard library and generated code is left out.
