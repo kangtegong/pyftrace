@@ -143,7 +143,19 @@ class LineCounter:
         struct.pack_into(self.FORMAT, self.map, 0, value)
         return value
 
+    def close(self):
+        """
+        Let go of the file.  Windows cannot delete a file that is open or
+        mapped, so every process closes it before the file is removed.
+        """
+        if self.map is None:
+            return
+        self.map.close()
+        self.map = None
+        os.close(self.fd)
+
     def remove(self):
+        self.close()
         try:
             os.remove(self.path)
         except OSError:

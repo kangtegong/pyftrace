@@ -1561,6 +1561,22 @@ class RegressionTests(PyftraceTestCase):
         self.assertEqual("threading", calls[0]["caller_module"])
         self.assertNotIn("caller_module", calls[1])
 
+    def test_max_lines_leaves_no_file(self):
+        """
+        The file that counts the lines of all processes is removed at
+        the end.  On Windows it stayed, open and mapped, in the temporary
+        directory, one more with every run.
+        """
+        temp_dir = tempfile.mkdtemp(prefix="pyftrace-test-temp-")
+        self.addCleanup(shutil.rmtree, temp_dir, True)
+        script = os.path.join(self.project_root, 'examples', 'processes.py')
+        with unittest.mock.patch.dict(os.environ, TMP=temp_dir, TEMP=temp_dir,
+                                      TMPDIR=temp_dir):
+            result = self.run_pyftrace(['-n', '3', script])
+
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual([], os.listdir(temp_dir))
+
     def test_verbose_calls_of_classes(self):
         """
         Calls of classes and built-in types are shown on Python 3.12 or

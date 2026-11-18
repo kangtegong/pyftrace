@@ -175,9 +175,10 @@ class PyftraceBase(ABC):
             self.tracing_started = False
             for collapser in self.collapsers:
                 collapser.finish()
+            # No thread may count a line once the counter is closed
+            self.cleanup_tracing()
             if self.line_counter and self.pid is None:
                 self.line_counter.remove()
-            self.cleanup_tracing()
             sys.path = old_sys_path
             sys.argv = old_sys_argv
 
@@ -256,6 +257,10 @@ class PyftraceBase(ABC):
         self.output_stream = None
         self.cleanup_tracing()
         self.tracing_active = False
+        # The process that started pyftrace removes the file, which
+        # Windows does not allow while this process has it open
+        if self.line_counter:
+            self.line_counter.close()
 
     @staticmethod
     def wait_for_threads():
