@@ -1,0 +1,12 @@
+{
+  "name": "pyftrace",
+  "description": "pyftrace, a Python function tracer, as a skill for Claude Code",
+  "owner": { "name": "Kang Minchul" },
+  "plugins": [
+    {
+      "name": "pyftrace",
+      "source": "./",
+      "description": "Teaches Claude to trace Python function calls with pyftrace while debugging"
+    }
+  ]
+}

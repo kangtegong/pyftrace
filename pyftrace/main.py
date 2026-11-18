@@ -5,20 +5,94 @@ from .utils import find_module_file, normalize_patterns
 from .output import FORMATS
 from .tui import run_tui
 from . import __version__
+import signal
 import tempfile
+import traceback
 import os
 
-def split_module_args(argv):
+def takes_value(arg, value_options):
     """
-    Split argv at '-m <module>'.  Like python itself, stop parsing
-    options there: the rest of the command line belongs to the module.
+    True if the option arg is completed by the argument that follows it.
     """
-    for i, arg in enumerate(argv[:-1]):
-        if arg == '--':
-            break
-        if arg == '-m':
+    if arg.startswith('--'):
+        if '=' in arg:
+            return False
+        # argparse accepts any unambiguous prefix of a long option
+        return any(option.startswith(arg) for option in value_options)
+    # A group of short options: -vd 3, or -vd3 with the value attached
+    for position, letter in enumerate(arg[1:], start=1):
+        if '-' + letter in value_options:
+            return position == len(arg) - 1
+    return False
+
+def split_target_args(argv, value_options):
+    """
+    Split argv into the arguments of pyftrace, the module given with -m
+    and the arguments of the traced program.  Like python itself, stop
+    reading options at the script or at '-m <module>': the rest of the
+    command line belongs to the program, options included.
+    """
+    i = 0
+    seen_tui = False
+    while i < len(argv):
+        arg = argv[i]
+        if arg == '-m' and i + 1 < len(argv):
             return argv[:i], argv[i + 1], argv[i + 2:]
+        if arg == '--':
+            return argv[:i + 2], None, argv[i + 2:]
+        if arg.startswith('-') and arg != '-':
+            i += 2 if takes_value(arg, value_options) else 1
+            continue
+        if arg == 'tui' and not seen_tui:
+            seen_tui = True
+            i += 1
+            continue
+        return argv[:i + 1], None, argv[i + 1:]
     return argv, None, []
+
+def print_program_traceback():
+    """
+    Print the traceback of an exception that ended the traced program
+    the way python would have: without the frames of pyftrace and runpy
+    that the program was started from.
+    """
+    exc_type, exc, full_tb = sys.exc_info()
+    tb = full_tb
+    own_dir = os.path.dirname(os.path.abspath(__file__)) + os.sep
+    while tb:
+        file_name = tb.tb_frame.f_code.co_filename
+        launcher = (os.path.abspath(file_name).startswith(own_dir)
+                    or os.path.basename(file_name) == 'runpy.py'
+                    or file_name == '<frozen runpy>')
+        if not launcher:
+            break
+        tb = tb.tb_next
+    if tb is None and not isinstance(exc, SyntaxError):
+        # Not raised by the program: a bug of pyftrace, show all of it
+        tb = full_tb
+    traceback.print_exception(exc_type, exc, tb)
+
+def line_count(text):
+    """
+    The value of an option that counts lines or levels: not negative.
+    """
+    value = int(text)
+    if value < 0:
+        raise argparse.ArgumentTypeError(f"{text} is negative")
+    return value
+
+def die_of_interrupt():
+    """
+    End the way python ends on Ctrl-C, so that whoever started pyftrace
+    sees a process that was interrupted, not one that failed.
+    """
+    # The signal leaves no time to flush what was just printed
+    sys.stdout.flush()
+    sys.stderr.flush()
+    if sys.platform == "win32":
+        sys.exit(130)
+    signal.signal(signal.SIGINT, signal.SIG_DFL)
+    os.kill(os.getpid(), signal.SIGINT)
 
 def run_target(tracer, module, script_path, target_args):
     if module:
@@ -32,6 +106,7 @@ def main():
         sys.exit(1)
 
     parser = argparse.ArgumentParser(
+        prog="pyftrace",
         usage="%(prog)s [options] [tui] (script | -m module) [args ...]",
         description="pyftrace: Python function tracing tool.",
         formatter_class=argparse.RawTextHelpFormatter
@@ -41,8 +116,8 @@ def main():
     parser.add_argument('-v', '--verbose', action='store_true', help="Enable built-in and third-party function tracing")
     parser.add_argument('-p', '--path', action='store_true', help="Show file paths in tracing output")
     parser.add_argument('-r', '--report', action='store_true', help="Generate a report of function execution times")
-    parser.add_argument('-d', '--depth', type=int, help="Limit the tracing output to DEPTH")
-    parser.add_argument('-n', '--max-lines', type=int, metavar='LINES', help="Stop printing the trace after LINES lines. The program keeps running")
+    parser.add_argument('-d', '--depth', type=line_count, help="Limit the tracing output to DEPTH")
+    parser.add_argument('-n', '--max-lines', type=line_count, metavar='LINES', help="Stop printing the trace after LINES lines. The program keeps running")
     parser.add_argument('-c', '--collapse', action='store_true', help="Print a call that repeats the one before it only once, followed by a repeat count")
     parser.add_argument('-f', '--function', action='append', help="Trace only calls of <function> and its subcalls. Can be repeated")
     parser.add_argument('-e', '--exclude-function', action='append', help="Exclude calls of <function> (and its subcalls) from tracing. Can be repeated")
@@ -56,7 +131,9 @@ def main():
 
     parser.add_argument('script', nargs='*', help="Path to the script to run and trace. Specify 'tui' before the script path to run in TUI mode.")
 
-    argv, module, module_args = split_module_args(sys.argv[1:])
+    value_options = {option for action in parser._actions
+                     if action.nargs != 0 for option in action.option_strings}
+    argv, module, program_args = split_target_args(sys.argv[1:], value_options)
     args = parser.parse_args(argv)
 
     is_tui_mode = bool(args.script) and args.script[0] == 'tui'
@@ -64,9 +141,7 @@ def main():
     script_path = None
 
     if module:
-        if targets:
-            parser.error("a script cannot be combined with -m")
-        target_args = module_args
+        target_args = program_args
         # As 'python -m' does, look the module up from the current directory
         sys.path.insert(0, os.getcwd())
         if find_module_file(module) is None:
@@ -76,7 +151,7 @@ def main():
         if not targets:
             parser.error("a script or -m module is required")
         script_path = targets[0]
-        target_args = targets[1:]
+        target_args = targets[1:] + program_args
         if not os.path.isfile(script_path):
             print(f"Error: Script '{script_path}' does not exist.")
             sys.exit(1)
@@ -92,6 +167,7 @@ def main():
 
     output_stream = sys.stdout
     output_file_handle = None
+    interrupted = False
     if args.output:
         # Child processes append to the same file, so the writes of this
         # process must go to its end too.  Empty it first.
@@ -145,14 +221,24 @@ def main():
             tracer.file_filter = normalize_patterns(args.file, search_dir)
             tracer.file_exclude = normalize_patterns(args.exclude_file, search_dir)
             tracer.format = FORMATS[args.format]
-            run_target(tracer, module, script_path, target_args)
-
-            if args.report:
-                tracer.print_report(stream=output_stream)
-                sys.exit(0)
+            try:
+                run_target(tracer, module, script_path, target_args)
+            except Exception:
+                print_program_traceback()
+                sys.exit(1)
+            except KeyboardInterrupt:
+                print_program_traceback()
+                interrupted = True
+            finally:
+                # Also when the program ends with sys.exit() or an exception
+                if args.report:
+                    tracer.print_report(stream=output_stream)
     finally:
         if output_file_handle:
             output_file_handle.close()
+
+    if interrupted:
+        die_of_interrupt()
 
 if __name__ == "__main__":
     main()

@@ -1,5 +1,46 @@
 # Changelog
 
+## [0.4.0] - 2026-11-18
+
+### Added
+- Options that bound and shape the trace:
+  - `-n`/`--max-lines`: stop printing after a number of lines.
+  - `-c`/`--collapse`: print repeated calls once, with a repeat count.
+  - `-F`/`--file`, `-E`/`--exclude-file`: trace only, or leave out, the functions of a file, directory, glob or module.
+  - `--format json`: one JSON object per trace event.
+  - `-m MODULE`: run and trace a module, like `python -m`.
+  - `python -m pyftrace`: run pyftrace with an interpreter of your choice.
+- Raised exceptions appear in the trace as `Raised` lines.
+- Threads and child processes are traced; their lines are marked with `[tid N]` and `[pid N]`.
+- A skill for AI coding agents (`skills/pyftrace/`) and Claude Code plugin files to install it.
+- New examples: Django, PyTorch, threads, processes, exceptions, loops, callbacks and generators.
+- Tests for the options, the TUI and the examples.
+
+### Changed
+- `-f`/`--function` and `-e`/`--exclude-function` can be repeated.
+- Options of pyftrace must come before the script. Everything after the script is passed to it, options included, so `pyftrace script.py --verbose` now gives `--verbose` to the script.
+- A program that dies of an exception prints its own traceback, without the frames of pyftrace.
+- `-o`/`--output` writes the trace only to the file; the traced program's own output stays on the terminal.
+- Class and module bodies are no longer shown as calls.
+- Arguments and return values are cut to one line of at most 200 characters.
+- Library code is skipped much more cheaply, so programs that use large libraries run far faster under pyftrace.
+- The package no longer installs a top-level `tests` package.
+
+### Fixed
+- `-r`/`--report` printed nothing when the program ended with `sys.exit()` or an exception, as every pytest run does.
+- `pyftrace ... | head` raised `BrokenPipeError` inside the traced program.
+- On Python 3.12 and later, generators and coroutines resumed by an exception (a failed `await`, a cancelled task, `throw()`, `close()`) were missing from the trace.
+- On Python 3.12 and later, pyftrace occupied the `sys.monitoring` tool id of coverage tools.
+- Scripts could not be given arguments that start with `-`.
+- On Python 3.8 to 3.11, a program that set a profile function of its own or ran `cProfile` ended the trace.
+- `--max-lines` was overrun by a few lines when several processes printed at once.
+- Ctrl-C printed the traceback of pyftrace on top of the one of the program.
+- Quitting the TUI on Linux ended with a traceback.
+- CI and the release workflow run on current GitHub runners again.
+
+---
+
+
 ## [0.3.1] - 2024-12-23
 
 ### Added

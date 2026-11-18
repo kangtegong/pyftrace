@@ -14,12 +14,24 @@ class PyftraceMonitoring(PyftraceBase):
     def __init__(self, verbose, show_path, report_mode, output_stream, function_filter=None, function_exclude=None, trace_arguments=False):
         super().__init__(verbose, show_path, report_mode, output_stream, function_filter, function_exclude, trace_arguments)
 
+    # Ids 0 to 2 and 5 are those of debuggers, coverage tools, profilers
+    # and optimizers.  A traced program that uses one of them itself
+    # must find its id free.
+    TOOL_IDS = (3, 4, 5, 2, 1, 0)
+
+    def find_tool_id(self):
+        for tool_id in self.TOOL_IDS:
+            if sys.monitoring.get_tool(tool_id) is None:
+                return tool_id
+        raise RuntimeError("pyftrace: every sys.monitoring tool id is in use")
+
     def setup_tracing(self):
-        self.tool_id = 1
+        self.tool_id = self.find_tool_id()
         self.ignored_codes = {}
         sys.monitoring.use_tool_id(self.tool_id, "pyftrace")
         sys.monitoring.register_callback(self.tool_id, sys.monitoring.events.PY_START, self.monitor_py_start)
         sys.monitoring.register_callback(self.tool_id, sys.monitoring.events.PY_RESUME, self.monitor_py_start)
+        sys.monitoring.register_callback(self.tool_id, sys.monitoring.events.PY_THROW, self.monitor_py_throw)
         sys.monitoring.register_callback(self.tool_id, sys.monitoring.events.PY_YIELD, self.monitor_py_return)
         sys.monitoring.register_callback(self.tool_id, sys.monitoring.events.CALL, self.monitor_call)
         sys.monitoring.register_callback(self.tool_id, sys.monitoring.events.PY_RETURN, self.monitor_py_return)
@@ -28,6 +40,7 @@ class PyftraceMonitoring(PyftraceBase):
         sys.monitoring.register_callback(self.tool_id, sys.monitoring.events.C_RAISE, self.monitor_c_raise)
         events = (sys.monitoring.events.PY_START |
                   sys.monitoring.events.PY_RESUME |
+                  sys.monitoring.events.PY_THROW |
                   sys.monitoring.events.PY_YIELD |
                   sys.monitoring.events.PY_RETURN |
                   sys.monitoring.events.PY_UNWIND)
@@ -45,11 +58,18 @@ class PyftraceMonitoring(PyftraceBase):
 
     # A generator or coroutine leaves the call stack while it is
     # suspended: PY_YIELD is handled like a return and PY_RESUME like a
-    # call, as a profile function sees them.
+    # call, as a profile function sees them.  PY_THROW is the resume of
+    # one that is given an exception instead of a value: by throw() and
+    # close(), by the cancelling of a task, and whenever what a
+    # coroutine awaits fails.
 
     def monitor_py_start(self, code, instruction_offset):
         # The callback is called from the frame of the function
         return self.handle_py_start_event(code, sys._getframe(1))
+
+    def monitor_py_throw(self, code, instruction_offset, exception):
+        # Like PY_UNWIND, PY_THROW cannot be disabled
+        self.handle_py_start_event(code, sys._getframe(1))
 
     def monitor_call(self, code, instruction_offset, callable_obj, arg0):
         self.handle_call_event(code, instruction_offset, callable_obj)

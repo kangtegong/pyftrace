@@ -8,6 +8,7 @@ import importlib.util
 import random
 import select
 import shutil
+import signal
 import sysconfig
 import tempfile
 import textwrap
@@ -160,6 +161,47 @@ class PyftraceTests(PyftraceTestCase):
         self.assertIn(expected_output, result.stdout)
         self.assertEqual(result.returncode, 0)
 
+    def run_into_head(self, args, lines):
+        """
+        Run pyftrace with its output piped into a reader that takes a
+        number of lines and closes the pipe.
+        """
+        cmd = [self.python_executable, '-m', self.pyftrace_module] + args
+        process = subprocess.Popen(cmd, stdout=subprocess.PIPE,
+                                   stderr=subprocess.PIPE,
+                                   cwd=self.project_root,
+                                   universal_newlines=True)
+        head = [process.stdout.readline() for _ in range(lines)]
+        process.stdout.close()
+        stderr = process.stderr.read()
+        process.stderr.close()
+        return head, stderr, process.wait()
+
+    def test_reader_closes_pipe(self):
+        """
+        'pyftrace script.py | head' ends the trace, not the program.
+        """
+        script = os.path.join(self.project_root, 'examples', 'loop.py')
+        head, stderr, status = self.run_into_head([script], 3)
+
+        self.assertIn("Called run", head[1])
+        self.assertEqual("", stderr)
+        self.assertEqual(0, status)
+
+    def test_run_as_package(self):
+        """
+        'python -m pyftrace' is the same command as 'pyftrace', run by
+        an interpreter of the caller's choice.
+        """
+        cmd = [self.python_executable, '-m', 'pyftrace', self.foobar_script]
+        result = subprocess.run(cmd, stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE, cwd=self.project_root,
+                                universal_newlines=True)
+
+        self.assertIn("Called foo", result.stdout)
+        self.assertNotIn("Called main", result.stdout)
+        self.assertEqual(result.returncode, 0)
+
     def test_help_option_short_h(self):
         """
         Test '-h' flag for help message.
@@ -209,7 +251,7 @@ class PyftraceTests(PyftraceTestCase):
         # An environment may have import hooks in site-packages, which
         # --verbose would show for every import.  Stay within the examples.
         examples = os.path.join(self.project_root, 'examples')
-        args = [self.main_script, '--verbose', '--file', examples]
+        args = ['--verbose', '--file', examples, self.main_script]
         result = self.run_pyftrace(args)
 
         expected_output = f"""Running script: {self.main_script}
@@ -619,6 +661,38 @@ Results: ret_a, ret_b
         self.assertEqual(normalized_expected, normalized_actual)
         self.assertEqual(result.returncode, 0)
 
+    def test_processes_max_lines_exact(self):
+        """
+        Processes that print at the same moment do not get past
+        '--max-lines' together.
+        """
+        result = self.run_source("""
+            import multiprocessing
+
+            def tick(n):
+                return n
+
+            def flood(start):
+                start.wait()
+                for n in range(300):
+                    tick(n)
+
+            if __name__ == "__main__":
+                start = multiprocessing.Event()
+                workers = [multiprocessing.Process(target=flood, args=(start,))
+                           for _ in range(4)]
+                for worker in workers:
+                    worker.start()
+                start.set()
+                for worker in workers:
+                    worker.join()
+        """, args=['--max-lines', '100'])
+
+        lines = result.stdout.splitlines()[1:]
+        notices = [line for line in lines if "truncated" in line]
+        self.assertEqual(101, len(lines))
+        self.assertEqual(["... trace truncated after 100 lines"], notices)
+
     def test_processes_report(self):
         """
         Test that '--report' includes the calls made in a child process.
@@ -755,6 +829,39 @@ class OptionTests(PyftraceTestCase):
         # The report replaces the trace
         self.assertEqual([], self.trace_lines(result.stdout))
         self.assertEqual(result.returncode, 0)
+
+    def test_report_after_exit(self):
+        """
+        A program that ends with sys.exit() still gets its report, and
+        its exit status is kept.  pytest and unittest end this way.
+        """
+        result = self.run_source("""
+            import sys
+
+            def work():
+                return 1
+
+            work()
+            sys.exit(3)
+        """, args=['--report'])
+
+        self.assertRegex(result.stdout, r"work\s+\|\s+\d+\.\d+ seconds\s+\|\s+1")
+        self.assertEqual(result.returncode, 3)
+
+    def test_report_after_exception(self):
+        """
+        A program that dies of an exception still gets its report.
+        """
+        result = self.run_source("""
+            def work():
+                raise KeyError("missing")
+
+            work()
+        """, args=['--report'])
+
+        self.assertRegex(result.stdout, r"work\s+\|\s+\d+\.\d+ seconds\s+\|\s+1")
+        self.assertIn("KeyError", result.stderr)
+        self.assertEqual(result.returncode, 1)
 
     def test_report_json(self):
         """
@@ -984,19 +1091,309 @@ class OptionTests(PyftraceTestCase):
         self.assertIn("a script or -m module is required", result.stderr)
         self.assertEqual(result.returncode, 2)
 
-    def test_script_and_module(self):
+    def test_traceback_of_program(self):
         """
-        Test the error for a script given together with '-m'.
+        A program that dies of an exception leaves the traceback python
+        would print for it, without the frames of pyftrace.
         """
-        result = self.run_pyftrace([self.foobar_script, '-m', 'examples.add'])
+        result = self.run_source("""
+            def work():
+                raise KeyError("missing")
 
-        self.assertIn("cannot be combined with -m", result.stderr)
-        self.assertEqual(result.returncode, 2)
+            work()
+        """)
+
+        self.assertIn("Traceback (most recent call last):", result.stderr)
+        self.assertIn("in work", result.stderr)
+        self.assertIn("KeyError: 'missing'", result.stderr)
+        self.assertNotIn("pyftrace", result.stderr.replace(self.script, ""))
+        self.assertNotIn("runpy", result.stderr)
+        self.assertEqual(result.returncode, 1)
+
+    @unittest.skipIf(sys.platform == "win32", "sends SIGINT")
+    def test_interrupted_program(self):
+        """
+        Ctrl-C ends the program as it does without pyftrace: its own
+        traceback, the report if one was asked for, death by SIGINT.
+        """
+        directory = tempfile.mkdtemp(prefix="pyftrace-test-")
+        self.addCleanup(shutil.rmtree, directory, True)
+        script = os.path.join(directory, "script.py")
+        with open(script, "w") as f:
+            f.write(textwrap.dedent("""
+                import time
+
+                def wait():
+                    print("waiting", flush=True)
+                    time.sleep(30)
+
+                wait()
+            """))
+        cmd = [self.python_executable, '-m', self.pyftrace_module, '-r', script]
+        process = subprocess.Popen(cmd, stdout=subprocess.PIPE,
+                                   stderr=subprocess.PIPE,
+                                   cwd=self.project_root,
+                                   universal_newlines=True)
+        while "waiting" not in process.stdout.readline():
+            pass
+        process.send_signal(signal.SIGINT)
+        stdout, stderr = process.communicate(timeout=20)
+
+        self.assertIn("in wait", stderr)
+        self.assertIn("KeyboardInterrupt", stderr)
+        self.assertNotIn("runpy", stderr)
+        self.assertRegex(stdout, r"wait\s+\|\s+\d+\.\d+ seconds\s+\|\s+1")
+        self.assertEqual(-signal.SIGINT, process.returncode)
+
+    def test_syntax_error_of_program(self):
+        """
+        A script that does not compile is reported like python does.
+        """
+        result = self.run_source("""
+            def work(:
+        """)
+
+        self.assertIn("SyntaxError", result.stderr)
+        self.assertNotIn("Traceback", result.stderr)
+        self.assertEqual(result.returncode, 1)
+
+    def test_negative_counts(self):
+        """
+        A negative number of lines or levels is refused, not taken as
+        "print nothing".
+        """
+        for option in ('-n', '-d'):
+            result = self.run_pyftrace([option, '-1', self.foobar_script])
+
+            self.assertIn("is negative", result.stderr)
+            self.assertEqual(result.returncode, 2)
+
+    def test_script_options(self):
+        """
+        What follows the script belongs to the script, options that
+        pyftrace has itself included.
+        """
+        result = self.run_source("""
+            import sys
+
+            def show():
+                return sys.argv[1:]
+
+            show()
+        """, args=['-d', '1'],
+             script_args=['-v', '--depth', '3', '-m', 'mod', '--help', 'x'])
+
+        self.assertIn("Returning show-> ['-v', '--depth', '3', '-m', 'mod', "
+                      "'--help', 'x']", result.stdout)
+        self.assertEqual("", result.stderr)
+        self.assertEqual(result.returncode, 0)
+
+    def test_grouped_options(self):
+        """
+        The script is found behind grouped short options, attached
+        values and abbreviated long options.
+        """
+        result = self.run_source("""
+            import sys
+
+            def show():
+                return sys.argv[1:]
+
+            show()
+        """, args=['-ad', '1', '-n5', '--form', 'text', '--max-lines=5'],
+             script_args=['-n', '0'])
+
+        self.assertIn("Returning show-> ['-n', '0']", result.stdout)
+        self.assertEqual(result.returncode, 0)
 
 class RegressionTests(PyftraceTestCase):
     """
     Programs that used to be traced wrongly, or broken by being traced.
     """
+
+    @unittest.skipUnless(hasattr(sys, "monitoring"), "needs sys.monitoring")
+    def test_program_measures_coverage(self):
+        """
+        A program that runs a coverage tool on sys.monitoring finds the
+        tool id of coverage tools free.
+        """
+        result = self.run_source("""
+            import sys
+
+            def work():
+                return 1
+
+            monitoring = sys.monitoring
+            monitoring.use_tool_id(monitoring.COVERAGE_ID, "coverage")
+            work()
+            monitoring.free_tool_id(monitoring.COVERAGE_ID)
+        """)
+
+        self.assertEqual("", result.stderr)
+        self.assertEqual(["    Called work from line 9",
+                          "    Returning work-> 1"],
+                         self.trace_lines(result.stdout))
+
+    def test_program_sets_profile_function(self):
+        """
+        A program that sets a profile function of its own gets its
+        events, and the trace goes on during and after.
+        """
+        result = self.run_source("""
+            import sys
+
+            seen = []
+
+            def profiler(frame, event, arg):
+                if event == "call":
+                    seen.append(frame.f_code.co_name)
+
+            def work(n):
+                return n
+
+            sys.setprofile(profiler)
+            work(1)
+            mine = sys.getprofile() is profiler
+            sys.setprofile(None)
+            work(2)
+            print("profiler saw", seen, mine, sys.getprofile())
+        """)
+
+        self.assertIn("profiler saw ['work'] True None", result.stdout)
+        self.assertEqual(["    Called work from line 14",
+                          "    Returning work-> 1",
+                          "    Called work from line 17",
+                          "    Returning work-> 2"],
+                         self.trace_lines(result.stdout))
+
+    def test_program_runs_cprofile(self):
+        """
+        The trace goes on after the program has profiled a part of
+        itself with cProfile, and cProfile gets its numbers.
+        """
+        result = self.run_source("""
+            import cProfile
+
+            def work(n):
+                return n
+
+            profiler = cProfile.Profile()
+            profiler.enable()
+            work(1)
+            profiler.disable()
+            calls = [entry.callcount for entry in profiler.getstats()
+                     if getattr(entry.code, "co_name", "") == "work"]
+            print("cProfile counted", calls)
+            work(2)
+        """)
+
+        self.assertIn("cProfile counted [1]", result.stdout)
+        self.assertEqual(["    Called work from line 14",
+                          "    Returning work-> 2"],
+                         self.trace_lines(result.stdout)[-2:])
+
+    def test_program_sets_thread_profile_function(self):
+        """
+        The same for threading.setprofile(): the threads started after
+        it are both profiled by the program and traced.
+        """
+        result = self.run_source("""
+            import threading
+
+            seen = []
+
+            def profiler(frame, event, arg):
+                if event == "call":
+                    seen.append(frame.f_code.co_name)
+
+            def work():
+                return 1
+
+            def start():
+                thread = threading.Thread(target=work)
+                thread.start()
+                thread.join()
+
+            threading.setprofile(profiler)
+            start()
+            threading.setprofile(None)
+            start()
+            print("profiler saw work:", seen.count("work"))
+        """)
+
+        self.assertIn("profiler saw work: 1", result.stdout)
+        self.assertEqual(2, result.stdout.count("Returning work-> 1"))
+
+    def test_generator_resumed_by_exception(self):
+        """
+        A generator that is resumed by throw() or close() is traced
+        like one resumed by next().
+        """
+        result = self.run_source("""
+            def helper(tag):
+                return tag
+
+            def gen():
+                try:
+                    yield helper("first")
+                except ValueError:
+                    yield helper("recovered")
+                finally:
+                    helper("cleanup")
+
+            g = gen()
+            next(g)
+            g.throw(ValueError("x"))
+            g.close()
+        """)
+
+        lines = [line.split("->")[0] for line in self.trace_lines(result.stdout)]
+        self.assertEqual([
+            "    Called gen from line 14",
+            "        Called helper from line 7",
+            "        Returning helper",
+            "    Returning gen",
+            "    Called gen from line 15",
+            "        Called helper from line 9",
+            "        Returning helper",
+            "    Returning gen",
+            "    Called gen from line 16",
+            "        Called helper from line 11",
+            "        Returning helper",
+            "    Raised gen",
+        ], lines)
+
+    def test_coroutine_resumed_by_exception(self):
+        """
+        A coroutine whose await fails goes on in the trace: what it
+        does about the exception is the interesting part.
+        """
+        result = self.run_source("""
+            import asyncio
+
+            def helper(tag):
+                return tag
+
+            async def fail():
+                await asyncio.sleep(0)
+                raise KeyError("missing")
+
+            async def main():
+                try:
+                    await asyncio.ensure_future(fail())
+                except KeyError:
+                    return helper("handled")
+
+            asyncio.run(main())
+        """)
+
+        lines = self.trace_lines(result.stdout)
+        self.assertEqual([
+            "        Called helper from line 15",
+            "        Returning helper-> handled",
+            "    Returning main-> handled",
+        ], lines[-3:])
+        self.assertRegex(lines[-4], r"^    Called main from line \d+$")
 
     def test_library_code_not_traced(self):
         """

@@ -24,6 +24,11 @@ jobs:
     - name: Install the libraries of the examples
       run: |
         python -m pip install django
+    - name: Install PyTorch for its example
+      # A large download: one version is enough to keep the example working
+      if: matrix.python-version == '3.12'
+      run: |
+        python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
     - name: Run tests
       run: |
         python tests/runtests.py

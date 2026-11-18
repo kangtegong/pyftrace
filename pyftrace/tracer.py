@@ -251,9 +251,7 @@ class PyftraceBase(ABC):
         self.save_child_report()
         for collapser in self.collapsers:
             collapser.finish()
-        if self.output_stream:
-            self.output_stream.flush()
-        if self.owns_output:
+        if self.owns_output and self.output_stream:
             # Opened by tracer_from_config().  Left open, the file would
             # only be closed while the interpreter is being torn down.
             self.output_stream.close()
@@ -302,8 +300,7 @@ class PyftraceBase(ABC):
 
     def emit_start(self, event):
         # The header is not part of the trace: --max-lines does not count it
-        if self.output_stream:
-            print(self.format(event), file=self.output_stream)
+        self.write_line(self.format(event))
 
     def report_call(self, func_name):
         if not self.report_mode:
@@ -367,6 +364,13 @@ class PyftraceBase(ABC):
     def print_report(self, stream=None):
         stream = stream or self.output_stream or sys.stdout
         self.collect_child_reports()
+        try:
+            self.write_report(stream)
+            stream.flush()
+        except BrokenPipeError:
+            self.discard(stream)
+
+    def write_report(self, stream):
         if self.format is format_text:
             print("\nFunction Name\t| Total Execution Time\t| Call Count", file=stream)
             print("---------------------------------------------------------", file=stream)
@@ -448,13 +452,44 @@ class PyftraceBase(ABC):
             if self.is_truncated():
                 return
             if self.line_counter:
-                self.line_counter.increment()
-            if self.is_truncated():
-                event = {"event": "truncated", "max_lines": self.max_lines}
-            self.output_stream.write(self.format(event) + "\n")
+                line = self.line_counter.claim()
+                if line > self.max_lines + 1:
+                    # Another process has printed the notice
+                    return
+                if line > self.max_lines:
+                    event = {"event": "truncated",
+                             "max_lines": self.max_lines}
+            self.write_line(self.format(event))
+
+    def write_line(self, line):
+        if not self.output_stream:
+            return
+        try:
+            self.output_stream.write(line + "\n")
             # A trace is read to find out why a program died, and a
             # program that dies does not flush its buffers.
             self.output_stream.flush()
+        except BrokenPipeError:
+            self.drop_output()
+
+    def drop_output(self):
+        """
+        The reader of the trace is gone, as in "pyftrace ... | head".
+        Stop printing and let the program run on, as --max-lines does.
+        """
+        stream, self.output_stream = self.output_stream, None
+        self.discard(stream)
+
+    @staticmethod
+    def discard(stream):
+        # What is left in the buffers is written when the interpreter
+        # exits, and would fail the same way there.
+        try:
+            devnull = os.open(os.devnull, os.O_WRONLY)
+            os.dup2(devnull, stream.fileno())
+            os.close(devnull)
+        except (OSError, ValueError):
+            pass
 
     def should_trace(self, file_name):
         if not file_name:
