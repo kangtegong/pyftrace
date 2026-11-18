@@ -86,7 +86,7 @@ class PyftraceTestCase(unittest.TestCase):
             stderr=subprocess.PIPE,
             cwd=cwd or self.project_root,
             # pyftrace is run from the source tree, wherever the command runs
-            env=dict(os.environ, PYTHONPATH=self.project_root),
+            env=dict(os.environ, PYTHONPATH=self.python_path()),
             text=True
         )
         self.output = result.stdout
@@ -102,6 +102,16 @@ class PyftraceTestCase(unittest.TestCase):
         # Standardize path separators for Windows
         normalized = normalized.replace("\r\n", "\n").replace("\\", "/")
         return normalized
+
+    def python_path(self):
+        """
+        The source tree first, then what PYTHONPATH already holds, such
+        as the place of a dependency that the interpreter lacks.
+        """
+        paths = [self.project_root]
+        if os.environ.get("PYTHONPATH"):
+            paths.append(os.environ["PYTHONPATH"])
+        return os.pathsep.join(paths)
 
     def run_source(self, source, args=(), script_args=()):
         """
@@ -1778,7 +1788,7 @@ class TuiTests(PyftraceTestCase):
         if pid == 0:
             os.chdir(self.project_root)
             os.environ.update(TERM="xterm", LINES="40", COLUMNS="160",
-                              PYTHONPATH=self.project_root)
+                              PYTHONPATH=self.python_path())
             os.execv(command[0], command)
 
         drawn = b""
