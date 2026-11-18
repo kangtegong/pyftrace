@@ -1,4 +1,2 @@
 - tui: fold/unfold
 - tui: '/' (search function)
-- multiprocessing(pid) & multithreading(tid) tracing
-- add some useful real world examples

@@ -19,11 +19,12 @@ Key features of pyftrace include:
 - **Execution Reports**: Generate reports detailing function execution times and call counts with the `--report` flag.
 - **Path Tracing**: Trace the path of traced Python file using the `--path` flag.
 - **TUI Mode**: Run pyftrace in a Text User Interface (TUI) mode using the `tui` command.
+- **Threads and Processes**: Trace the threads of a program and the processes it starts with `multiprocessing` or `os.fork()`. Their lines are marked with `[tid N]` and `[pid N]`.
 - **Function Filtering**: Filter the function you want to track with the `--function` and `--exclude-function` flag.
 
 ```
 $ pyftrace --help
-usage: pyftrace [options] [tui] script [script_args ...]
+usage: pyftrace [options] [tui] (script | -m module) [args ...]
 
 pyftrace: Python function tracing tool.
 
@@ -38,10 +39,22 @@ options:
   -r, --report          Generate a report of function execution times
   -d DEPTH, --depth DEPTH
                         Limit the tracing output to DEPTH
+  -n LINES, --max-lines LINES
+                        Stop printing the trace after LINES lines. The program keeps running
+  -c, --collapse        Print a call that repeats the one before it only once, followed by a repeat count
   -f FUNCTION, --function FUNCTION
-                        Trace only calls of <function> and its subcalls
+                        Trace only calls of <function> and its subcalls. Can be repeated
   -e EXCLUDE_FUNCTION, --exclude-function EXCLUDE_FUNCTION
-                        Exclude calls of <function> (and its subcalls) from tracing
+                        Exclude calls of <function> (and its subcalls) from tracing. Can be repeated
+  -F PATH, --file PATH  Trace only functions defined in PATH: a file, a directory or a glob. Can be repeated
+  -E PATH, --exclude-file PATH
+                        Do not trace functions defined in PATH. Can be repeated
+  -a, --argument        Show function arguments in tracing output (Python frames only)
+  --format {json,text}  Output format: 'text' (default) or 'json', one JSON object per line
+  -o OUTPUT, --output OUTPUT
+                        Write tracing output to a file. The traced program's own output is not redirected
+  -m MODULE             Run and trace a library module as a script, like 'python -m'.
+                        Everything after MODULE is passed to the module.
 ```
 
 ## Usage
@@ -76,13 +89,19 @@ $ pip install pyftrace
 - `--report` or `-r`: Generate a report of function execution times and call counts at the end of the script's execution.
 - `--verbose` or `-v`: Enable tracing of built-in functions (e.g., print, len). Without this flag, pyftrace only traces user-defined functions.
 - `--argument` or `-a`: Show function arguments for Python functions.
-- `--output` or `-o <filename>`: Write tracing output to a file instead of stdout.
+- `--output` or `-o <filename>`: Write tracing output to a file instead of stdout. The traced program's own output still goes to stdout.
+- `--format <text|json>`: Choose the output format. With `json`, every trace event is printed as one JSON object per line, e.g. `{"event": "call", "depth": 1, "function": "foo", "line": 9}`.
+- `-m <module> [args ...]`: Run and trace a module as `python -m` does, e.g. `pyftrace -m pytest tests/`. Everything after the module name is passed to the module, so pyftrace's own options must come before `-m`.
 - `--path` or `-p`: Include file paths in the tracing output. 
 - `--help` or `-h`: Display help information about pyftrace and its options.
 - `--version` or `-V`: Display help information about pyftrace and its options.
 - `--depth` or `-d`: Limit the depth of the function to be traced. 
-- `--function` or `-f`: Filter the names of function to be traced.
-- `--exclude-function` or `-e`: Exclude the specified function from the trace. 
+- `--max-lines` or `-n <lines>`: Stop printing the trace after the given number of lines. The traced program keeps running to the end.
+- `--collapse` or `-c`: Print a call that is identical to the previous one, including everything it calls, only once, followed by `... repeated N more times`. Useful for loops.
+- `--function` or `-f`: Filter the names of function to be traced. Can be given more than once.
+- `--exclude-function` or `-e`: Exclude the specified function from the trace. Can be given more than once.
+- `--file` or `-F <path>`: Trace only functions defined in the given file, directory or glob pattern, or in a module or package given by name, e.g. `-F src/mypkg` or `-F mypkg.core`. Can be given more than once.
+- `--exclude-file` or `-E <path>`: Do not trace functions defined in the given file, directory or glob pattern. Can be given more than once.
 
 ## TUI
 
@@ -293,6 +312,42 @@ function_a     	| 0.000021 seconds	| 1
 function_b     	| 0.000016 seconds	| 1
 ```
 
+
+### Real-World Examples
+
+The `examples/` directory also has programs built on large libraries. pyftrace leaves library code out unless `--verbose` is given, so their traces show the application code only.
+
+- `django_example.py`: a one-file Django application with a middleware and two views, driven by the test client.
+- `pytorch_example.py`: a training loop with a model class, training steps and an evaluation.
+
+```
+$ pip install django
+$ pyftrace examples/django_example.py
+Running script: examples/django_example.py
+    Called main from line 83
+        Called __init__ from line 63
+        Returning __init__-> None
+        Called __call__ from line 56
+            Called article_list from line 199
+                Called serialize from line 45
+                Returning serialize-> {'id': 1, 'title': 'Tracing Python'}
+                Called serialize from line 45
+                Returning serialize-> {'id': 2, 'title': 'Tracing Django'}
+            Returning article_list-> <JsonResponse status_code=200, "application/json">
+        Returning __call__-> <JsonResponse status_code=200, "application/json">
+GET /articles/ -> 200
+...
+        Called __call__ from line 56
+            Called article_detail from line 199
+                Called find_article from line 49
+                Raised find_article-> Http404: No article 99
+            Raised article_detail-> Http404: No article 99
+        Returning __call__-> <HttpResponseNotFound status_code=404, "text/html; charset=utf-8">
+GET /articles/99/ -> 404
+    Returning main-> None
+```
+
+`article_list` is called from line 199 of a Django file: the line of the caller is shown even when the caller itself is not traced. Use `--path` to see which file it is.
 
 ### Notes
 - simple-pyftrace.py is a simplified pyftrace script for the [Pycon Korea 2024](https://2024.pycon.kr/) presentation. It is about 100 lines of code, but has limited functionality. 

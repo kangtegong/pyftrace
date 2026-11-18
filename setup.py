@@ -18,7 +18,7 @@ setup(
     author="Kang Minchul",
     author_email="tegongkang@gmail.com",
     url="https://github.com/kangtegong/pyftrace",
-    packages=find_packages(),
+    packages=find_packages(exclude=["tests", "tests.*"]),
     entry_points={
         "console_scripts": [
             "pyftrace=pyftrace.main:main",

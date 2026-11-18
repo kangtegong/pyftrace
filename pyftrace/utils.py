@@ -1,6 +1,16 @@
 import sys
 import os
 import weakref
+import dis
+import fnmatch
+import importlib.util
+
+# A frame that returns or yields normally stops at one of these
+EXIT_OPCODES = frozenset(
+    dis.opmap[name]
+    for name in ("RETURN_VALUE", "RETURN_CONST", "YIELD_VALUE", "RESUME")
+    if name in dis.opmap
+)
 from typing import List
 
 def resolve_filename(code, callable_obj):
@@ -21,6 +31,74 @@ def resolve_filename(code, callable_obj):
             if module and hasattr(module, '__file__'):
                 filename = module.__file__
     return filename
+
+# Set in the code of a function, but not in that of a module or class body
+CO_OPTIMIZED = 0x01
+
+def is_function_code(code):
+    """
+    False for code that runs because of a definition or an import
+    rather than a call: the body of a class or of a module.
+    """
+    return bool(code.co_flags & CO_OPTIMIZED)
+
+def callable_name(callable_obj):
+    """
+    Name a traced callable without calling into user code: str() and
+    repr() may be overridden and can raise or have side effects.
+    """
+    name = getattr(callable_obj, '__name__', None)
+    if isinstance(name, str):
+        return name
+    return type(callable_obj).__name__
+
+def safe_str(value):
+    """
+    str() that cannot fail: __str__ of a traced object is user code.
+    """
+    try:
+        return shorten(str(value))
+    except Exception:
+        return f"<unprintable {type(value).__name__}>"
+
+# A value is cut off beyond this many characters
+MAX_VALUE_LENGTH = 200
+
+def shorten(text):
+    """
+    Fit a value into a line of trace: on a single line and not
+    arbitrarily long.
+    """
+    text = " ".join(text.split())
+    if len(text) > MAX_VALUE_LENGTH:
+        text = text[:MAX_VALUE_LENGTH] + "..."
+    return text
+
+def format_exception(exception):
+    """
+    Describe an exception like the last line of a traceback does.
+    """
+    name = type(exception).__name__
+    message = safe_str(exception)
+    return f"{name}: {message}" if message else name
+
+YIELD_FROM = dis.opmap.get("YIELD_FROM")
+
+def is_unwinding(frame, retval):
+    """
+    sys.setprofile() reports an exception leaving a frame as a return
+    of None.  Tell the two apart by the instruction the frame stopped at.
+    """
+    if retval is not None:
+        return False
+    code = frame.f_code.co_code
+    if code[frame.f_lasti] in EXIT_OPCODES:
+        return False
+    # Up to Python 3.10, a frame suspended in 'await' or 'yield from'
+    # is left pointing at the instruction before its YIELD_FROM.  One
+    # that points at the YIELD_FROM itself had an exception come out of it.
+    following = frame.f_lasti + 2
+    return following >= len(code) or code[following] != YIELD_FROM
 
 def get_line_number(code, instruction_offset):
     if code is None:
@@ -44,6 +122,70 @@ def find_import_end_line(script_path):
         return max(import_line_numbers)
     else:
         return 0
+
+
+def module_paths(name):
+    """
+    Return the file of a module or the directories of a package, or
+    nothing if name is not the name of an importable module.
+    """
+    if not all(part.isidentifier() for part in name.split('.')):
+        return []
+    try:
+        spec = importlib.util.find_spec(name)
+    except (ImportError, ValueError):
+        return []
+    if spec is None:
+        return []
+    if spec.submodule_search_locations is not None:
+        return list(spec.submodule_search_locations)
+    return [spec.origin] if spec.has_location else []
+
+def normalize_patterns(patterns, search_dir=None):
+    """
+    Prepare what was given with -F and -E for path_matches().  An entry
+    that is not an existing path is tried as a module name, looked up
+    in search_dir first and then like an import.
+    """
+    paths = []
+    if search_dir is not None:
+        sys.path.insert(0, search_dir)
+    try:
+        for pattern in patterns or ():
+            if os.path.exists(pattern):
+                paths.append(pattern)
+            else:
+                paths.extend(module_paths(pattern) or [pattern])
+    finally:
+        if search_dir is not None:
+            sys.path.remove(search_dir)
+    return tuple(os.path.normcase(os.path.abspath(path)) for path in paths)
+
+def path_matches(path, patterns):
+    """
+    True if path is one of the patterns, lies in a directory that is,
+    or matches one as a glob.
+    """
+    for pattern in patterns:
+        if path == pattern or path.startswith(os.path.join(pattern, '')):
+            return True
+        if fnmatch.fnmatchcase(path, pattern):
+            return True
+    return False
+
+def find_module_file(module_name):
+    """
+    Return the file that 'python -m module_name' would run, or None.
+    """
+    try:
+        spec = importlib.util.find_spec(module_name)
+        if spec and spec.submodule_search_locations is not None:
+            spec = importlib.util.find_spec(module_name + ".__main__")
+    except ImportError:
+        return None
+    if spec is None or not spec.has_location:
+        return None
+    return spec.origin
 
 
 def format_arguments(frame) -> str:
@@ -90,7 +232,7 @@ def format_arguments(frame) -> str:
 
     def safe_repr(value):
         try:
-            return repr(value)
+            return shorten(repr(value))
         except Exception:
             return f"<unreprable {type(value).__name__}>"
 

@@ -1,9 +1,10 @@
 import sys
 import os
-import time
 import sysconfig
+import threading
 from ..tracer import PyftraceBase
-from ..utils import resolve_filename, get_line_number, find_import_end_line, format_arguments
+from ..utils import resolve_filename, format_arguments, callable_name
+from ..utils import is_unwinding, is_function_code
 
 class PyftraceSetprofile(PyftraceBase):
     """
@@ -14,60 +15,64 @@ class PyftraceSetprofile(PyftraceBase):
         super().__init__(verbose, show_path, report_mode, output_stream, function_filter, function_exclude, trace_arguments)
 
     def setup_tracing(self):
+        # sys.setprofile() is per thread: hook the threads started later too
+        self.stopped = False
+        # Code objects whose calls and returns need no handling at all
+        self.ignored_codes = set()
+        # C functions are shown with --verbose only, but -e can name one
+        # to hide the Python functions it calls back
+        self.ignore_c_events = not self.verbose and not self.function_exclude
+        threading.setprofile(self.profile_func)
         sys.setprofile(self.profile_func)
 
     def cleanup_tracing(self):
         sys.setprofile(None)
-
-    def run_python_script(self, script_path, script_args):
-        if self.output_stream:
-            print(f"Running script: {script_path}", file=self.output_stream)
-
-        self.script_name = os.path.abspath(script_path)
-        self.script_dir = os.path.dirname(self.script_name)
-
-        # For use import_end_line to start tracing after imports
-        self.import_end_line = find_import_end_line(script_path)
-
-        with open(script_path, "r") as file:
-            script_code = file.read()
-            code_object = compile(script_code, script_path, 'exec')
-
-        old_sys_path = sys.path.copy()
-        old_sys_argv = sys.argv.copy()
-        sys.path.insert(0, self.script_dir)
-        sys.argv = [script_path] + script_args
-
-        self.tracing_started = False
-
-        self.setup_tracing()
-
-        try:
-            exec(code_object, {"__file__": script_path, "__name__": "__main__"})
-        finally:
-            self.tracing_started = False
-            self.cleanup_tracing()
-            sys.path = old_sys_path
-            sys.argv = old_sys_argv
+        threading.setprofile(None)
+        # Threads that are still running keep their hook
+        self.stopped = True
 
     def profile_func(self, frame, event, arg):
+        # This runs for every call the program and its libraries make.
+        # Get rid of the ones that cannot matter as cheaply as possible.
+        if self.stopped:
+            return
+        if event == "call" or event == "return":
+            if frame.f_code in self.ignored_codes and self.tracing_started:
+                return
+        elif self.ignore_c_events and self.tracing_started:
+            return
+        if self.thread_state.muted:
+            return
         if event == "call":
             self.handle_call_event(frame, arg, is_c_call=False)
         elif event == "return":
-            self.handle_return_event(frame, arg, is_c_return=False)
+            self.handle_return_event(frame, arg, is_c_return=False,
+                                     raised=is_unwinding(frame, arg))
         elif event == "c_call":
             self.handle_call_event(frame, arg, is_c_call=True)
         elif event == "c_return":
             self.handle_return_event(frame, arg, is_c_return=True)
         elif event == "c_exception":
-            pass
+            self.handle_return_event(frame, arg, is_c_return=True, raised=True)
         else:
             pass
 
+    def ignore_code(self, code, filename):
+        """
+        Whether a Python function is traced depends on where it is
+        defined and on the options.  Once it is known that one is not,
+        profile_func() does not have to look at it again.
+        """
+        if code is None:
+            return
+        # The top-level code of the script ends the trace when it returns
+        if filename == self.script_name and code.co_name == '<module>':
+            return
+        self.ignored_codes.add(code)
+
     def handle_call_event(self, frame, arg, is_c_call=False):
         if is_c_call:
-            # Get the '__name__' attribute of 'arg', or use str(arg) if '__name__' is not present
-            func_name = getattr(arg, '__name__', str(arg))
+            func_name = callable_name(arg)
             # Retrieve the '__module__' attribute of 'arg', or use '' if it's not available
             module_name = getattr(arg, '__module__', '') or ''
             code = None
@@ -106,13 +111,16 @@ class PyftraceSetprofile(PyftraceBase):
                 return
             self.tracing_started = True
 
-        if func_name == '<module>':
+        # Module and class bodies are not traced
+        if code and not is_function_code(code):
+            self.ignore_code(code, filename)
             return
 
         trace_this = False
 
         if self.is_stdlib_code(filename):
             if not self.verbose:
+                self.ignore_code(code, filename)
                 return
             trace_this = True
         else:
@@ -127,30 +135,30 @@ class PyftraceSetprofile(PyftraceBase):
                 elif self.verbose and module_name == 'builtins':
                     trace_this = True
 
-        if self.exclude_depth > 0:
-            return
-        if self.function_exclude and func_name == self.function_exclude:
+        # For a C function, frame is the caller: it belongs to that file
+        owner = filename or frame.f_code.co_filename
+        trace_this = trace_this and self.file_selected(owner)
+
+        if not trace_this and func_name not in self.function_exclude:
+            self.ignore_code(code, filename)
+
+        if self.function_exclude and func_name in self.function_exclude:
             self.exclude_depth += 1
+        if self.exclude_depth > 0:
             return
 
         if self.function_filter:
-            if self.filter_depth == 0:
-                if func_name == self.function_filter and trace_this:
-                    self.filter_depth += 1
-                else:
-                    return
-            else:
-                if not trace_this:
-                    return
+            if func_name in self.function_filter and trace_this:
+                self.filter_depth += 1
+            if self.filter_depth == 0 or not trace_this:
+                return
 
         if trace_this:
             self.call_stack.append(func_name)
-            indent = "    " * self.current_depth()
 
-            if not is_c_call and code:
-                func_def_lineno = code.co_firstlineno
-            else:
-                func_def_lineno = ''
+            def_location = filename
+            if filename and not is_c_call and code:
+                def_location = f"{filename}:{code.co_firstlineno}"
 
             if caller_frame:
                 call_lineno = caller_frame.f_lineno
@@ -161,43 +169,21 @@ class PyftraceSetprofile(PyftraceBase):
                 call_lineno = ''
                 call_filename = ''
 
-            if self.show_path:
-                if func_def_lineno:
-                    func_location = f"{func_name}@{filename}:{func_def_lineno}" if filename else func_name
-                else:
-                    func_location = f"{func_name}@{filename}" if filename else func_name
-                if call_filename and call_lineno:
-                    call_location = f"from {call_filename}:{call_lineno}"
-                else:
-                    call_location = f"from line {call_lineno}"
-            else:
-                func_location = func_name
-                call_location = f"from line {call_lineno}"
-
-            arg_suffix = ""
+            arguments = ""
             if self.trace_arguments and not is_c_call and code:
-                arg_display = format_arguments(frame)
-                if arg_display:
-                    arg_suffix = f" ({arg_display})"
+                arguments = format_arguments(frame)
 
-            if not self.report_mode and self.output_stream:
-                if self.max_depth is None or self.current_depth() <= self.max_depth:
-                    print(f"{indent}Called {func_location}{arg_suffix} {call_location}", file=self.output_stream)
+            self.emit_call(func_name, def_location, call_filename, call_lineno,
+                           arguments)
 
-            if self.report_mode:
-                start_time = time.time()
-                if func_name in self.execution_report:
-                    _, total_time, call_count = self.execution_report[func_name]
-                    self.execution_report[func_name] = (start_time, total_time, call_count + 1)
-                else:
-                    self.execution_report[func_name] = (start_time, 0, 1)
+            self.report_call(func_name)
 
-    def handle_return_event(self, frame, arg, is_c_return):
+    def handle_return_event(self, frame, arg, is_c_return, raised=False):
         if not self.tracing_started:
             return
 
         if is_c_return:
-            func_name = getattr(arg, '__name__', str(arg))
+            func_name = callable_name(arg)
             module_name = getattr(arg, '__module__', '') or ''
             code = None
             filename = None
@@ -216,10 +202,18 @@ class PyftraceSetprofile(PyftraceBase):
             return
 
         if func_name == '<module>':
+            if (filename == self.script_name
+                    and frame.f_globals.get('__name__') == '__main__'):
+                # The program is over for this thread.  What it runs from
+                # here on is the machinery that started the program.
+                self.thread_state.muted = True
+            return
+
+        if code and not is_function_code(code):
             return
 
         if self.exclude_depth > 0:
-            if self.function_exclude and func_name == self.function_exclude:
+            if self.function_exclude and func_name in self.function_exclude:
                 self.exclude_depth -= 1
             return
 
@@ -241,25 +235,25 @@ class PyftraceSetprofile(PyftraceBase):
                         if self.call_stack and self.call_stack[-1] == func_name:
                             trace_this = True
 
+        owner = filename or frame.f_code.co_filename
+        trace_this = trace_this and self.file_selected(owner)
+
+        if self.function_filter:
+            if self.filter_depth == 0:
+                return
+            if func_name in self.function_filter and trace_this:
+                self.filter_depth -= 1
+
         if trace_this and self.call_stack and self.call_stack[-1] == func_name:
-            indent = "    " * self.current_depth()
-
-            if self.show_path:
-                file_info = f" @ {filename}" if filename else ""
+            if raised:
+                # The exception itself is not passed to a profile function
+                self.emit_exit(func_name, filename, raised=True)
+            elif is_c_return:
+                self.emit_exit(func_name, filename)
             else:
-                file_info = ""
+                self.emit_exit(func_name, filename, value=arg)
 
-            if not self.report_mode and self.output_stream:
-                if self.max_depth is None or self.current_depth() <= self.max_depth:
-                    return_value = ''
-                    if not is_c_return:
-                        return_value = f"-> {arg}"
-                    print(f"{indent}Returning {func_name}{return_value}{file_info}", file=self.output_stream)
-
-            if self.report_mode and func_name in self.execution_report:
-                start_time, total_time, call_count = self.execution_report[func_name]
-                exec_time = time.time() - start_time
-                self.execution_report[func_name] = (start_time, total_time + exec_time, call_count)
+            self.report_return(func_name)
 
             self.call_stack.pop()
 
