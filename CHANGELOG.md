@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Added
+- A call made from library code names the module of its line: `Called worker from line 1012 in threading`, and `caller_module` in JSON.
+
 ### Changed
 - `-v` leaves out the standard library on every version of Python, as it did on 3.12 and later.  On Python 3.8 to 3.11 it traced it, the import system included.
 - The tests run on Windows in CI too.
@@ -11,6 +14,10 @@
 - On Windows, `--max-lines` was still overrun by a few lines when several processes printed at once.
 - On Windows, outside a virtual environment, `-v` traced the standard library as if it were third-party code.
 - `-v` showed the finders that installed packages add to the import system, such as the one of setuptools, before every import.
+- On Python 3.8 to 3.11, what a script ran before its last import line was not traced: a decorator applied while a module of the program was imported, a setup call between two imports.
+- pyftrace died with `UnicodeDecodeError` on a script that is not ASCII, such as one with a Korean comment, when the locale is not UTF-8, as on a Korean Windows.
+- A value in the trace that the output could not encode, such as an emoji on a cp949 console, killed the traced program.  It is written as an escape now.
+- The temporary file of the TUI mixed the encoding of the locale and UTF-8.
 - The tests replaced the `PYTHONPATH` of the caller instead of adding to it.
 
 ---
