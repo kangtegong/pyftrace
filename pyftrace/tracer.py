@@ -545,7 +545,13 @@ class PyftraceBase(ABC):
             dirs += site.getsitepackages()
         if hasattr(site, "getusersitepackages"):
             dirs.append(site.getusersitepackages())
-        return PyftraceBase.normalize_dirs(dirs)
+        # On Windows, outside a virtual environment, the installation
+        # directory itself is a site directory.  It holds the standard
+        # library, which must not count as library code.
+        stdlib = PyftraceBase.normalize_dirs([paths["stdlib"]])
+        site_dirs = PyftraceBase.normalize_dirs(dirs)
+        return tuple(d for d in site_dirs
+                     if not any(s.startswith(d) for s in stdlib))
 
     @staticmethod
     def normalize_dirs(dirs):

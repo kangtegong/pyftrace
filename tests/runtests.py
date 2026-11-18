@@ -9,6 +9,7 @@ import random
 import select
 import shutil
 import signal
+import site
 import sysconfig
 import tempfile
 import textwrap
@@ -1636,6 +1637,21 @@ class LibraryCodeTests(unittest.TestCase):
         self.assertFalse(self.verbose_tracer.should_trace(os.__file__))
         # The same file reached through a resolved path
         self.assertFalse(self.tracer.should_trace(os.path.realpath(os.__file__)))
+
+    def test_site_dir_above_standard_library(self):
+        """
+        On Windows, outside a virtual environment, the installation
+        directory that holds the standard library is a site directory.
+        """
+        stdlib = sysconfig.get_paths()["stdlib"]
+        install_dir = os.path.dirname(stdlib)
+        original = site.getsitepackages
+        site.getsitepackages = lambda: [install_dir]
+        try:
+            tracer = get_tracer(verbose=True)
+        finally:
+            site.getsitepackages = original
+        self.assertFalse(tracer.should_trace(os.__file__))
 
     def test_site_packages(self):
         module = os.path.join(sysconfig.get_paths()["purelib"],
