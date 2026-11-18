@@ -8,16 +8,44 @@ from . import __version__
 import tempfile
 import os
 
-def split_module_args(argv):
+def takes_value(arg, value_options):
     """
-    Split argv at '-m <module>'.  Like python itself, stop parsing
-    options there: the rest of the command line belongs to the module.
+    True if the option arg is completed by the argument that follows it.
     """
-    for i, arg in enumerate(argv[:-1]):
-        if arg == '--':
-            break
-        if arg == '-m':
+    if arg.startswith('--'):
+        if '=' in arg:
+            return False
+        # argparse accepts any unambiguous prefix of a long option
+        return any(option.startswith(arg) for option in value_options)
+    # A group of short options: -vd 3, or -vd3 with the value attached
+    for position, letter in enumerate(arg[1:], start=1):
+        if '-' + letter in value_options:
+            return position == len(arg) - 1
+    return False
+
+def split_target_args(argv, value_options):
+    """
+    Split argv into the arguments of pyftrace, the module given with -m
+    and the arguments of the traced program.  Like python itself, stop
+    reading options at the script or at '-m <module>': the rest of the
+    command line belongs to the program, options included.
+    """
+    i = 0
+    seen_tui = False
+    while i < len(argv):
+        arg = argv[i]
+        if arg == '-m' and i + 1 < len(argv):
             return argv[:i], argv[i + 1], argv[i + 2:]
+        if arg == '--':
+            return argv[:i + 2], None, argv[i + 2:]
+        if arg.startswith('-') and arg != '-':
+            i += 2 if takes_value(arg, value_options) else 1
+            continue
+        if arg == 'tui' and not seen_tui:
+            seen_tui = True
+            i += 1
+            continue
+        return argv[:i + 1], None, argv[i + 1:]
     return argv, None, []
 
 def run_target(tracer, module, script_path, target_args):
@@ -57,7 +85,9 @@ def main():
 
     parser.add_argument('script', nargs='*', help="Path to the script to run and trace. Specify 'tui' before the script path to run in TUI mode.")
 
-    argv, module, module_args = split_module_args(sys.argv[1:])
+    value_options = {option for action in parser._actions
+                     if action.nargs != 0 for option in action.option_strings}
+    argv, module, program_args = split_target_args(sys.argv[1:], value_options)
     args = parser.parse_args(argv)
 
     is_tui_mode = bool(args.script) and args.script[0] == 'tui'
@@ -65,9 +95,7 @@ def main():
     script_path = None
 
     if module:
-        if targets:
-            parser.error("a script cannot be combined with -m")
-        target_args = module_args
+        target_args = program_args
         # As 'python -m' does, look the module up from the current directory
         sys.path.insert(0, os.getcwd())
         if find_module_file(module) is None:
@@ -77,7 +105,7 @@ def main():
         if not targets:
             parser.error("a script or -m module is required")
         script_path = targets[0]
-        target_args = targets[1:]
+        target_args = targets[1:] + program_args
         if not os.path.isfile(script_path):
             print(f"Error: Script '{script_path}' does not exist.")
             sys.exit(1)

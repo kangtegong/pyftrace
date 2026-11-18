@@ -250,7 +250,7 @@ class PyftraceTests(PyftraceTestCase):
         # An environment may have import hooks in site-packages, which
         # --verbose would show for every import.  Stay within the examples.
         examples = os.path.join(self.project_root, 'examples')
-        args = [self.main_script, '--verbose', '--file', examples]
+        args = ['--verbose', '--file', examples, self.main_script]
         result = self.run_pyftrace(args)
 
         expected_output = f"""Running script: {self.main_script}
@@ -1058,14 +1058,43 @@ class OptionTests(PyftraceTestCase):
         self.assertIn("a script or -m module is required", result.stderr)
         self.assertEqual(result.returncode, 2)
 
-    def test_script_and_module(self):
+    def test_script_options(self):
         """
-        Test the error for a script given together with '-m'.
+        What follows the script belongs to the script, options that
+        pyftrace has itself included.
         """
-        result = self.run_pyftrace([self.foobar_script, '-m', 'examples.add'])
+        result = self.run_source("""
+            import sys
 
-        self.assertIn("cannot be combined with -m", result.stderr)
-        self.assertEqual(result.returncode, 2)
+            def show():
+                return sys.argv[1:]
+
+            show()
+        """, args=['-d', '1'],
+             script_args=['-v', '--depth', '3', '-m', 'mod', '--help', 'x'])
+
+        self.assertIn("Returning show-> ['-v', '--depth', '3', '-m', 'mod', "
+                      "'--help', 'x']", result.stdout)
+        self.assertEqual("", result.stderr)
+        self.assertEqual(result.returncode, 0)
+
+    def test_grouped_options(self):
+        """
+        The script is found behind grouped short options, attached
+        values and abbreviated long options.
+        """
+        result = self.run_source("""
+            import sys
+
+            def show():
+                return sys.argv[1:]
+
+            show()
+        """, args=['-ad', '1', '-n5', '--form', 'text', '--max-lines=5'],
+             script_args=['-n', '0'])
+
+        self.assertIn("Returning show-> ['-n', '0']", result.stdout)
+        self.assertEqual(result.returncode, 0)
 
 class RegressionTests(PyftraceTestCase):
     """
