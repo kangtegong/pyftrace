@@ -18,6 +18,7 @@
 - pyftrace died with `UnicodeDecodeError` on a script that is not ASCII, such as one with a Korean comment, when the locale is not UTF-8, as on a Korean Windows.
 - A value in the trace that the output could not encode, such as an emoji on a cp949 console, killed the traced program.  It is written as an escape now.
 - The temporary file of the TUI mixed the encoding of the locale and UTF-8.
+- On Windows, a program interrupted with Ctrl-C ended with exit code 130 instead of the `STATUS_CONTROL_C_EXIT` that python gives it there.
 - The tests replaced the `PYTHONPATH` of the caller instead of adding to it.
 
 ---
