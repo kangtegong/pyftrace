@@ -4,7 +4,10 @@
   "description": "Teaches Claude to trace Python function calls with pyftrace while debugging",
   "author": { "name": "Kang Minchul" },
   "homepage": "https://github.com/kangtegong/pyftrace",
+  "documentationUrl": "https://github.com/kangtegong/pyftrace#readme",
+  "supportUrl": "https://github.com/kangtegong/pyftrace/issues",
   "repository": "https://github.com/kangtegong/pyftrace",
   "license": "MIT",
+  "icon": "./.claude-plugin/icon.png",
   "keywords": ["python", "tracing", "debugging"]
 }
