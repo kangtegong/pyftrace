@@ -71,6 +71,15 @@ def print_program_traceback():
         tb = full_tb
     traceback.print_exception(exc_type, exc, tb)
 
+def line_count(text):
+    """
+    The value of an option that counts lines or levels: not negative.
+    """
+    value = int(text)
+    if value < 0:
+        raise argparse.ArgumentTypeError(f"{text} is negative")
+    return value
+
 def run_target(tracer, module, script_path, target_args):
     if module:
         tracer.run_python_module(module, target_args)
@@ -93,8 +102,8 @@ def main():
     parser.add_argument('-v', '--verbose', action='store_true', help="Enable built-in and third-party function tracing")
     parser.add_argument('-p', '--path', action='store_true', help="Show file paths in tracing output")
     parser.add_argument('-r', '--report', action='store_true', help="Generate a report of function execution times")
-    parser.add_argument('-d', '--depth', type=int, help="Limit the tracing output to DEPTH")
-    parser.add_argument('-n', '--max-lines', type=int, metavar='LINES', help="Stop printing the trace after LINES lines. The program keeps running")
+    parser.add_argument('-d', '--depth', type=line_count, help="Limit the tracing output to DEPTH")
+    parser.add_argument('-n', '--max-lines', type=line_count, metavar='LINES', help="Stop printing the trace after LINES lines. The program keeps running")
     parser.add_argument('-c', '--collapse', action='store_true', help="Print a call that repeats the one before it only once, followed by a repeat count")
     parser.add_argument('-f', '--function', action='append', help="Trace only calls of <function> and its subcalls. Can be repeated")
     parser.add_argument('-e', '--exclude-function', action='append', help="Exclude calls of <function> (and its subcalls) from tracing. Can be repeated")

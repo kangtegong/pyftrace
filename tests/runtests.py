@@ -1089,6 +1089,17 @@ class OptionTests(PyftraceTestCase):
         self.assertNotIn("Traceback", result.stderr)
         self.assertEqual(result.returncode, 1)
 
+    def test_negative_counts(self):
+        """
+        A negative number of lines or levels is refused, not taken as
+        "print nothing".
+        """
+        for option in ('-n', '-d'):
+            result = self.run_pyftrace([option, '-1', self.foobar_script])
+
+            self.assertIn("is negative", result.stderr)
+            self.assertEqual(result.returncode, 2)
+
     def test_script_options(self):
         """
         What follows the script belongs to the script, options that
