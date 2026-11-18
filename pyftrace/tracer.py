@@ -377,7 +377,7 @@ class PyftraceBase(ABC):
         for func_name, (total_time, call_count) in sorted_report:
             event = {"event": "report", "function": func_name,
                      "seconds": total_time, "calls": call_count}
-            self.write_text(stream, self.format(event) + "\n")
+            self.write_text(stream, self.format(event) + "\n", event)
 
     def current_depth(self):
         return len(self.call_stack)
@@ -456,13 +456,13 @@ class PyftraceBase(ABC):
                 if line > self.max_lines:
                     event = {"event": "truncated",
                              "max_lines": self.max_lines}
-            self.write_line(self.format(event))
+            self.write_line(self.format(event), event)
 
-    def write_line(self, line):
+    def write_line(self, line, event=None):
         if not self.output_stream:
             return
         try:
-            self.write_text(self.output_stream, line + "\n")
+            self.write_text(self.output_stream, line + "\n", event)
             # A trace is read to find out why a program died, and a
             # program that dies does not flush its buffers.
             self.output_stream.flush()
@@ -471,16 +471,19 @@ class PyftraceBase(ABC):
                 raise
             self.drop_output()
 
-    @staticmethod
-    def write_text(stream, text):
+    def write_text(self, stream, text, event=None):
         """
         Write text, with what the encoding of stream cannot hold written
         as escapes.  A value in the trace must not kill the program, as
-        a return value with an emoji did on a Korean Windows.
+        a return value with an emoji did on a Korean Windows.  text is
+        event rendered; JSON has escapes of its own.
         """
         try:
             stream.write(text)
         except UnicodeEncodeError:
+            if event is not None and self.format is not format_text:
+                stream.write(json.dumps(event) + "\n")
+                return
             encoding = getattr(stream, "encoding", None) or "ascii"
             stream.write(text.encode(encoding, "backslashreplace")
                          .decode(encoding))

@@ -1503,10 +1503,21 @@ class RegressionTests(PyftraceTestCase):
 
                 mood()
             """)
+            self.assertEqual(0, result.returncode, result.stderr)
+            self.assertIn("    Returning mood-> ok \\U0001f600",
+                          self.trace_lines(result.stdout))
+
+            # Escapes of JSON, not of Python
+            result = self.run_source("""
+                def mood():
+                    return "ok \\U0001F600"
+
+                mood()
+            """, args=['--format', 'json'])
 
         self.assertEqual(0, result.returncode, result.stderr)
-        self.assertIn("    Returning mood-> ok \\U0001f600",
-                      self.trace_lines(result.stdout))
+        events = [json.loads(line) for line in result.stdout.splitlines()]
+        self.assertEqual("ok \U0001F600", events[-1]["value"])
 
     def test_verbose_leaves_out_standard_library(self):
         """
