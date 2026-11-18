@@ -8,6 +8,7 @@ import importlib.util
 import random
 import select
 import shutil
+import signal
 import sysconfig
 import tempfile
 import textwrap
@@ -1108,6 +1109,41 @@ class OptionTests(PyftraceTestCase):
         self.assertNotIn("pyftrace", result.stderr.replace(self.script, ""))
         self.assertNotIn("runpy", result.stderr)
         self.assertEqual(result.returncode, 1)
+
+    @unittest.skipIf(sys.platform == "win32", "sends SIGINT")
+    def test_interrupted_program(self):
+        """
+        Ctrl-C ends the program as it does without pyftrace: its own
+        traceback, the report if one was asked for, death by SIGINT.
+        """
+        directory = tempfile.mkdtemp(prefix="pyftrace-test-")
+        self.addCleanup(shutil.rmtree, directory, True)
+        script = os.path.join(directory, "script.py")
+        with open(script, "w") as f:
+            f.write(textwrap.dedent("""
+                import time
+
+                def wait():
+                    print("waiting", flush=True)
+                    time.sleep(30)
+
+                wait()
+            """))
+        cmd = [self.python_executable, '-m', self.pyftrace_module, '-r', script]
+        process = subprocess.Popen(cmd, stdout=subprocess.PIPE,
+                                   stderr=subprocess.PIPE,
+                                   cwd=self.project_root,
+                                   universal_newlines=True)
+        while "waiting" not in process.stdout.readline():
+            pass
+        process.send_signal(signal.SIGINT)
+        stdout, stderr = process.communicate(timeout=20)
+
+        self.assertIn("in wait", stderr)
+        self.assertIn("KeyboardInterrupt", stderr)
+        self.assertNotIn("runpy", stderr)
+        self.assertRegex(stdout, r"wait\s+\|\s+\d+\.\d+ seconds\s+\|\s+1")
+        self.assertEqual(-signal.SIGINT, process.returncode)
 
     def test_syntax_error_of_program(self):
         """

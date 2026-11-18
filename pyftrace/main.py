@@ -5,6 +5,7 @@ from .utils import find_module_file, normalize_patterns
 from .output import FORMATS
 from .tui import run_tui
 from . import __version__
+import signal
 import tempfile
 import traceback
 import os
@@ -80,6 +81,19 @@ def line_count(text):
         raise argparse.ArgumentTypeError(f"{text} is negative")
     return value
 
+def die_of_interrupt():
+    """
+    End the way python ends on Ctrl-C, so that whoever started pyftrace
+    sees a process that was interrupted, not one that failed.
+    """
+    # The signal leaves no time to flush what was just printed
+    sys.stdout.flush()
+    sys.stderr.flush()
+    if sys.platform == "win32":
+        sys.exit(130)
+    signal.signal(signal.SIGINT, signal.SIG_DFL)
+    os.kill(os.getpid(), signal.SIGINT)
+
 def run_target(tracer, module, script_path, target_args):
     if module:
         tracer.run_python_module(module, target_args)
@@ -153,6 +167,7 @@ def main():
 
     output_stream = sys.stdout
     output_file_handle = None
+    interrupted = False
     if args.output:
         # Child processes append to the same file, so the writes of this
         # process must go to its end too.  Empty it first.
@@ -211,6 +226,9 @@ def main():
             except Exception:
                 print_program_traceback()
                 sys.exit(1)
+            except KeyboardInterrupt:
+                print_program_traceback()
+                interrupted = True
             finally:
                 # Also when the program ends with sys.exit() or an exception
                 if args.report:
@@ -218,6 +236,9 @@ def main():
     finally:
         if output_file_handle:
             output_file_handle.close()
+
+    if interrupted:
+        die_of_interrupt()
 
 if __name__ == "__main__":
     main()
