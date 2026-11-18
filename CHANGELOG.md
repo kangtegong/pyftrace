@@ -9,9 +9,10 @@
   - `-F`/`--file`, `-E`/`--exclude-file`: trace only, or leave out, the functions of a file, directory, glob or module.
   - `--format json`: one JSON object per trace event.
   - `-m MODULE`: run and trace a module, like `python -m`.
+  - `python -m pyftrace`: run pyftrace with an interpreter of your choice.
 - Raised exceptions appear in the trace as `Raised` lines.
 - Threads and child processes are traced; their lines are marked with `[tid N]` and `[pid N]`.
-- A skill for AI coding agents (`skills/pyftrace/SKILL.md`) and Claude Code plugin files to install it.
+- A skill for AI coding agents (`skills/pyftrace/`) and Claude Code plugin files to install it.
 - New examples: Django, PyTorch, threads, processes, exceptions, loops, callbacks and generators.
 - Tests for the options, the TUI and the examples.
 
@@ -24,6 +25,8 @@
 - The package no longer installs a top-level `tests` package.
 
 ### Fixed
+- `-r`/`--report` printed nothing when the program ended with `sys.exit()` or an exception, as every pytest run does.
+- `pyftrace ... | head` raised `BrokenPipeError` inside the traced program.
 - Quitting the TUI on Linux ended with a traceback.
 - CI and the release workflow run on current GitHub runners again.
 
