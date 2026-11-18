@@ -10,6 +10,13 @@ jobs:
         # The last image that has Python 3.8 and 3.9
         os: [ubuntu-24.04]
         python-version: ["3.8", "3.9", "3.10", "3.11", "3.12", "3.13"]
+        # Pipes, locks and install paths differ on Windows.  One version
+        # for each engine: sys.setprofile and sys.monitoring.
+        include:
+          - os: windows-latest
+            python-version: "3.8"
+          - os: windows-latest
+            python-version: "3.13"
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -24,6 +31,10 @@ jobs:
     - name: Install the libraries of the examples
       run: |
         python -m pip install django
+    - name: Install curses for the TUI
+      if: runner.os == 'Windows'
+      run: |
+        python -m pip install windows-curses
     - name: Install PyTorch for its example
       # A large download: one version is enough to keep the example working
       if: matrix.python-version == '3.12'
