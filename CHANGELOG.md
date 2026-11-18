@@ -18,6 +18,8 @@
 
 ### Changed
 - `-f`/`--function` and `-e`/`--exclude-function` can be repeated.
+- Options of pyftrace must come before the script. Everything after the script is passed to it, options included, so `pyftrace script.py --verbose` now gives `--verbose` to the script.
+- A program that dies of an exception prints its own traceback, without the frames of pyftrace.
 - `-o`/`--output` writes the trace only to the file; the traced program's own output stays on the terminal.
 - Class and module bodies are no longer shown as calls.
 - Arguments and return values are cut to one line of at most 200 characters.
@@ -27,6 +29,9 @@
 ### Fixed
 - `-r`/`--report` printed nothing when the program ended with `sys.exit()` or an exception, as every pytest run does.
 - `pyftrace ... | head` raised `BrokenPipeError` inside the traced program.
+- On Python 3.12 and later, generators and coroutines resumed by an exception (a failed `await`, a cancelled task, `throw()`, `close()`) were missing from the trace.
+- On Python 3.12 and later, pyftrace occupied the `sys.monitoring` tool id of coverage tools.
+- Scripts could not be given arguments that start with `-`.
 - Quitting the TUI on Linux ended with a traceback.
 - CI and the release workflow run on current GitHub runners again.
 
