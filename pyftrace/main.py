@@ -145,11 +145,12 @@ def main():
             tracer.file_filter = normalize_patterns(args.file, search_dir)
             tracer.file_exclude = normalize_patterns(args.exclude_file, search_dir)
             tracer.format = FORMATS[args.format]
-            run_target(tracer, module, script_path, target_args)
-
-            if args.report:
-                tracer.print_report(stream=output_stream)
-                sys.exit(0)
+            try:
+                run_target(tracer, module, script_path, target_args)
+            finally:
+                # Also when the program ends with sys.exit() or an exception
+                if args.report:
+                    tracer.print_report(stream=output_stream)
     finally:
         if output_file_handle:
             output_file_handle.close()

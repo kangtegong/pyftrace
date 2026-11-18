@@ -756,6 +756,39 @@ class OptionTests(PyftraceTestCase):
         self.assertEqual([], self.trace_lines(result.stdout))
         self.assertEqual(result.returncode, 0)
 
+    def test_report_after_exit(self):
+        """
+        A program that ends with sys.exit() still gets its report, and
+        its exit status is kept.  pytest and unittest end this way.
+        """
+        result = self.run_source("""
+            import sys
+
+            def work():
+                return 1
+
+            work()
+            sys.exit(3)
+        """, args=['--report'])
+
+        self.assertRegex(result.stdout, r"work\s+\|\s+\d+\.\d+ seconds\s+\|\s+1")
+        self.assertEqual(result.returncode, 3)
+
+    def test_report_after_exception(self):
+        """
+        A program that dies of an exception still gets its report.
+        """
+        result = self.run_source("""
+            def work():
+                raise KeyError("missing")
+
+            work()
+        """, args=['--report'])
+
+        self.assertRegex(result.stdout, r"work\s+\|\s+\d+\.\d+ seconds\s+\|\s+1")
+        self.assertIn("KeyError", result.stderr)
+        self.assertEqual(result.returncode, 1)
+
     def test_report_json(self):
         """
         Test '--report' with '--format json'.
