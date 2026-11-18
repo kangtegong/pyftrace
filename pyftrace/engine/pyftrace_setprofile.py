@@ -1,3 +1,4 @@
+import cProfile
 import sys
 import os
 import sysconfig
@@ -22,20 +23,81 @@ class PyftraceSetprofile(PyftraceBase):
         # C functions are shown with --verbose only, but -e can name one
         # to hide the Python functions it calls back
         self.ignore_c_events = not self.verbose and not self.function_exclude
+        self.share_hook()
         threading.setprofile(self.profile_func)
         sys.setprofile(self.profile_func)
 
     def cleanup_tracing(self):
+        self.unshare_hook()
         sys.setprofile(None)
         threading.setprofile(None)
         # Threads that are still running keep their hook
         self.stopped = True
+
+    # A thread has one profile function, and pyftrace needs it.  A
+    # program that sets one of its own, to profile itself, would end the
+    # trace.  Give the program functions that keep both going.
+
+    def share_hook(self):
+        # The profile function of the program, by thread
+        self.program_profiles = {}
+        self.real_setprofile = sys.setprofile
+        self.real_getprofile = sys.getprofile
+        self.real_thread_setprofile = threading.setprofile
+        sys.setprofile = self.set_program_profile
+        sys.getprofile = self.get_program_profile
+        threading.setprofile = self.set_thread_profile
+        # cProfile sets its function from C, past sys.setprofile().  The
+        # trace stands still while it has the hook; take it back after.
+        def disable(profiler):
+            super(cProfile.Profile, profiler).disable()
+            self.real_setprofile(self.profile_func)
+        cProfile.Profile.disable = disable
+
+    def unshare_hook(self):
+        sys.setprofile = self.real_setprofile
+        sys.getprofile = self.real_getprofile
+        threading.setprofile = self.real_thread_setprofile
+        try:
+            del cProfile.Profile.disable
+        except AttributeError:
+            pass
+
+    def set_program_profile(self, func):
+        if func == self.profile_func:
+            # threading installs the hook of a new thread this way
+            func = None
+        ident = threading.get_ident()
+        if func is None:
+            self.program_profiles.pop(ident, None)
+        else:
+            self.program_profiles[ident] = func
+        self.real_setprofile(self.profile_func)
+
+    def get_program_profile(self):
+        return self.program_profiles.get(threading.get_ident())
+
+    def set_thread_profile(self, func):
+        # Without a function of the program, new threads still need ours
+        self.real_thread_setprofile(func or self.profile_func)
+
+    def call_program_profile(self, frame, event, arg):
+        program_profile = self.get_program_profile()
+        if program_profile is None:
+            return
+        # The functions it was set with are ours.  The real ones are
+        # written in C and are not seen as Python calls.
+        if frame.f_code.co_filename.startswith(self.tracer_dir):
+            return
+        program_profile(frame, event, arg)
 
     def profile_func(self, frame, event, arg):
         # This runs for every call the program and its libraries make.
         # Get rid of the ones that cannot matter as cheaply as possible.
         if self.stopped:
             return
+        if self.program_profiles:
+            self.call_program_profile(frame, event, arg)
         if event == "call" or event == "return":
             if frame.f_code in self.ignored_codes and self.tracing_started:
                 return

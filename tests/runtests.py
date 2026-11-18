@@ -1166,6 +1166,96 @@ class RegressionTests(PyftraceTestCase):
                           "    Returning work-> 1"],
                          self.trace_lines(result.stdout))
 
+    def test_program_sets_profile_function(self):
+        """
+        A program that sets a profile function of its own gets its
+        events, and the trace goes on during and after.
+        """
+        result = self.run_source("""
+            import sys
+
+            seen = []
+
+            def profiler(frame, event, arg):
+                if event == "call":
+                    seen.append(frame.f_code.co_name)
+
+            def work(n):
+                return n
+
+            sys.setprofile(profiler)
+            work(1)
+            mine = sys.getprofile() is profiler
+            sys.setprofile(None)
+            work(2)
+            print("profiler saw", seen, mine, sys.getprofile())
+        """)
+
+        self.assertIn("profiler saw ['work'] True None", result.stdout)
+        self.assertEqual(["    Called work from line 14",
+                          "    Returning work-> 1",
+                          "    Called work from line 17",
+                          "    Returning work-> 2"],
+                         self.trace_lines(result.stdout))
+
+    def test_program_runs_cprofile(self):
+        """
+        The trace goes on after the program has profiled a part of
+        itself with cProfile, and cProfile gets its numbers.
+        """
+        result = self.run_source("""
+            import cProfile
+
+            def work(n):
+                return n
+
+            profiler = cProfile.Profile()
+            profiler.enable()
+            work(1)
+            profiler.disable()
+            calls = [entry.callcount for entry in profiler.getstats()
+                     if getattr(entry.code, "co_name", "") == "work"]
+            print("cProfile counted", calls)
+            work(2)
+        """)
+
+        self.assertIn("cProfile counted [1]", result.stdout)
+        self.assertEqual(["    Called work from line 14",
+                          "    Returning work-> 2"],
+                         self.trace_lines(result.stdout)[-2:])
+
+    def test_program_sets_thread_profile_function(self):
+        """
+        The same for threading.setprofile(): the threads started after
+        it are both profiled by the program and traced.
+        """
+        result = self.run_source("""
+            import threading
+
+            seen = []
+
+            def profiler(frame, event, arg):
+                if event == "call":
+                    seen.append(frame.f_code.co_name)
+
+            def work():
+                return 1
+
+            def start():
+                thread = threading.Thread(target=work)
+                thread.start()
+                thread.join()
+
+            threading.setprofile(profiler)
+            start()
+            threading.setprofile(None)
+            start()
+            print("profiler saw work:", seen.count("work"))
+        """)
+
+        self.assertIn("profiler saw work: 1", result.stdout)
+        self.assertEqual(2, result.stdout.count("Returning work-> 1"))
+
     def test_generator_resumed_by_exception(self):
         """
         A generator that is resumed by throw() or close() is traced
