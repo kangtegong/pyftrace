@@ -96,6 +96,10 @@ Claude Code에서는 스킬을 플러그인으로 설치합니다. 세션의 프
 $ claude plugin install pyftrace --marketplace kangtegong/pyftrace
 ```
 
+`/plugin`은 터미널에서 실행하는 Claude Code에만 있습니다. VS Code 확장처럼
+"/plugin isn't available in this environment"라고 나오는 곳에서는 셸
+명령을 쓰세요. 스킬은 그 뒤에 시작하는 세션부터 적용됩니다.
+
 다른 에이전트는 [skills/pyftrace/SKILL.md](skills/pyftrace/SKILL.md)를
 그대로 읽으면 됩니다. 에이전트가 스킬이나 지침을 찾는 위치에 복사해
 두세요.
