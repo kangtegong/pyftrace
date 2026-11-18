@@ -50,7 +50,7 @@ with grep before concluding the function is never called.
 | --- | --- |
 | `-a`, `--argument` | Add the arguments to each `Called` line, as `name=value` pairs. |
 | `-p`, `--path` | Add file paths: `Called f@FILE:DEFLINE from CALLERFILE:LINE`, and ` @ FILE` on return lines. |
-| `-v`, `--verbose` | Also trace built-in functions and installed packages.  The standard library stays out, and so do the finders and loaders that packages add to the import system.  Built-ins have no return value in the trace.  Slow on Python 3.8 to 3.11. |
+| `-v`, `--verbose` | Also trace built-in functions and installed packages.  The standard library stays out, and so do the finders and loaders that packages add to the import system.  Built-ins have no return value in the trace.  On Python 3.12 or later it also shows calls of classes and built-in types, such as `Called Cart` around its `__init__` or `Called int` and `Raised int`; Python 3.8 to 3.11 does not report them to a tracer.  Slow on Python 3.8 to 3.11. |
 
 Values are printed with `repr()`, on one line, cut at 200 characters.
 An object without a useful `repr` shows as `<shop.cart.Cart object at

@@ -1561,6 +1561,33 @@ class RegressionTests(PyftraceTestCase):
         self.assertEqual("threading", calls[0]["caller_module"])
         self.assertNotIn("caller_module", calls[1])
 
+    def test_verbose_calls_of_classes(self):
+        """
+        Calls of classes and built-in types are shown on Python 3.12 or
+        later only: Python 3.8 to 3.11 does not report them to a profile
+        function, as the documentation of -v says.
+        """
+        result = self.run_source("""
+            class Cart:
+                def __init__(self):
+                    self.items = []
+
+            def main():
+                Cart()
+                int("1")
+
+            main()
+        """, args=['-v'])
+
+        lines = [line.strip() for line in self.trace_lines(result.stdout)]
+        if sys.version_info >= (3, 12):
+            self.assertIn("Called Cart from line 7", lines)
+            self.assertIn("Called int from line 8", lines)
+        else:
+            self.assertNotIn("Called Cart from line 7", lines)
+            self.assertNotIn("Called int from line 8", lines)
+        self.assertIn("Called __init__ from line 7", lines)
+
     def test_verbose_leaves_out_standard_library(self):
         """
         -v adds built-ins and installed packages, not the standard
