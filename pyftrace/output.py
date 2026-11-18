@@ -4,6 +4,12 @@ import os
 import struct
 import tempfile
 
+try:
+    import fcntl
+except ImportError:
+    # Windows.  The count of several processes is not exact there.
+    fcntl = None
+
 INDENT = "    "
 
 # The fields that tell which process and thread an event comes from.
@@ -73,9 +79,8 @@ class LineCounter:
     maps into its memory, so that --max-lines limits what all of them
     print together.
 
-    Nothing keeps two processes from updating it at the same moment.
-    The limit can be overrun by a line or two then, which is cheaper
-    than taking a lock for every line of trace.
+    The file is locked while a line is counted: two processes that
+    print at the same moment must not both get the last line.
     """
     FORMAT = "q"
 
@@ -87,15 +92,29 @@ class LineCounter:
         else:
             fd = os.open(path, os.O_RDWR)
         self.path = path
+        self.fd = fd
         self.map = mmap.mmap(fd, size)
-        os.close(fd)
 
     @property
     def value(self):
         return struct.unpack_from(self.FORMAT, self.map)[0]
 
+    def claim(self):
+        """
+        Count one more line and return its number.
+        """
+        if fcntl is None:
+            return self.increment()
+        fcntl.lockf(self.fd, fcntl.LOCK_EX)
+        try:
+            return self.increment()
+        finally:
+            fcntl.lockf(self.fd, fcntl.LOCK_UN)
+
     def increment(self):
-        struct.pack_into(self.FORMAT, self.map, 0, self.value + 1)
+        value = self.value + 1
+        struct.pack_into(self.FORMAT, self.map, 0, value)
+        return value
 
     def remove(self):
         try:

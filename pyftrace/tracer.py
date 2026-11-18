@@ -452,9 +452,13 @@ class PyftraceBase(ABC):
             if self.is_truncated():
                 return
             if self.line_counter:
-                self.line_counter.increment()
-            if self.is_truncated():
-                event = {"event": "truncated", "max_lines": self.max_lines}
+                line = self.line_counter.claim()
+                if line > self.max_lines + 1:
+                    # Another process has printed the notice
+                    return
+                if line > self.max_lines:
+                    event = {"event": "truncated",
+                             "max_lines": self.max_lines}
             self.write_line(self.format(event))
 
     def write_line(self, line):

@@ -660,6 +660,38 @@ Results: ret_a, ret_b
         self.assertEqual(normalized_expected, normalized_actual)
         self.assertEqual(result.returncode, 0)
 
+    def test_processes_max_lines_exact(self):
+        """
+        Processes that print at the same moment do not get past
+        '--max-lines' together.
+        """
+        result = self.run_source("""
+            import multiprocessing
+
+            def tick(n):
+                return n
+
+            def flood(start):
+                start.wait()
+                for n in range(300):
+                    tick(n)
+
+            if __name__ == "__main__":
+                start = multiprocessing.Event()
+                workers = [multiprocessing.Process(target=flood, args=(start,))
+                           for _ in range(4)]
+                for worker in workers:
+                    worker.start()
+                start.set()
+                for worker in workers:
+                    worker.join()
+        """, args=['--max-lines', '100'])
+
+        lines = result.stdout.splitlines()[1:]
+        notices = [line for line in lines if "truncated" in line]
+        self.assertEqual(101, len(lines))
+        self.assertEqual(["... trace truncated after 100 lines"], notices)
+
     def test_processes_report(self):
         """
         Test that '--report' includes the calls made in a child process.
