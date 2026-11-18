@@ -20,6 +20,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 from pyftrace import __version__ as pyftrace_version
 from pyftrace.output import Collapser
 from pyftrace.tracer import get_tracer
+from pyftrace.utils import normalize_patterns
 
 class PyftraceTestCase(unittest.TestCase):
     @classmethod
@@ -1682,11 +1683,13 @@ class LibraryCodeTests(unittest.TestCase):
         other = os.path.join(examples, 'module_trace', 'module_a.py')
 
         self.assertTrue(self.tracer.file_selected(script))
-        self.tracer.file_filter = (os.path.join(examples, 'module_trace'),)
+        self.tracer.file_filter = normalize_patterns(
+            [os.path.join(examples, 'module_trace')])
         self.assertFalse(self.tracer.file_selected(script))
         self.assertTrue(self.tracer.file_selected(other))
         self.tracer.file_filter = ()
-        self.tracer.file_exclude = (os.path.join(examples, '*', 'module_a.py'),)
+        self.tracer.file_exclude = normalize_patterns(
+            [os.path.join(examples, '*', 'module_a.py')])
         self.assertTrue(self.tracer.file_selected(script))
         self.assertFalse(self.tracer.file_selected(other))
 
