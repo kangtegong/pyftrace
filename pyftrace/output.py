@@ -1,3 +1,4 @@
+import errno
 import json
 import mmap
 import os
@@ -124,9 +125,11 @@ class LineCounter:
                 try:
                     msvcrt.locking(self.fd, msvcrt.LK_LOCK, self.map.size())
                     return
-                except OSError:
-                    # LK_LOCK gives up after ten seconds of waiting
-                    pass
+                except OSError as error:
+                    # LK_LOCK gives up after ten seconds of waiting.  Any
+                    # other error would come back on every try.
+                    if error.errno != errno.EDEADLOCK:
+                        raise
 
     def unlock(self):
         if fcntl is not None:
