@@ -69,8 +69,7 @@ indentation is its own depth.
     grep -F '[tid 68479205]' /tmp/trace.txt     # one thread
     grep -v -e '\[tid' -e '\[pid' /tmp/trace.txt  # the main thread only
 
-`-n` limits the lines of all threads and processes together, and may
-overrun by a line or two when several are printing at once.  `-r` adds
+`-n` limits the lines of all threads and processes together.  `-r` adds
 the calls made in child processes to the report.
 
 Programs started with `subprocess` or `os.exec` are separate programs
@@ -113,11 +112,10 @@ last call that started.
 
 ## Programs that profile or trace themselves
 
-On Python 3.12 or later a program can run cProfile, coverage or a
-debugger while it is traced.  On Python 3.8 to 3.11 pyftrace uses the
-profiling hook of the interpreter, and a program that takes the hook
-for itself (`cProfile`, `sys.setprofile`) and does not give it back
-ends the trace at that point.
+A program can run a profiler or measure coverage while it is traced.
+On Python 3.8 to 3.11 there is one gap: while `cProfile` is enabled
+the trace stands still, and the calls made in between are missing.  It
+goes on when the profiler is disabled.
 
 ## Large or slow programs
 
