@@ -1,0 +1,10 @@
+{
+  "name": "pyftrace",
+  "version": "0.4.0",
+  "description": "Teaches Claude to trace Python function calls with pyftrace while debugging",
+  "author": { "name": "Kang Minchul" },
+  "homepage": "https://github.com/kangtegong/pyftrace",
+  "repository": "https://github.com/kangtegong/pyftrace",
+  "license": "MIT",
+  "keywords": ["python", "tracing", "debugging"]
+}
