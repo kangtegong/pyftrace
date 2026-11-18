@@ -1,5 +1,21 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+- `-v` leaves out the standard library on every version of Python, as it did on 3.12 and later.  On Python 3.8 to 3.11 it traced it, the import system included.
+- The tests run on Windows in CI too.
+
+### Fixed
+- On Windows, `pyftrace ... | head` still raised an error inside the traced program, since Windows reports a closed pipe as `EINVAL`.
+- On Windows, `--max-lines` was still overrun by a few lines when several processes printed at once.
+- On Windows, outside a virtual environment, `-v` traced the standard library as if it were third-party code.
+- `-v` showed the finders that installed packages add to the import system, such as the one of setuptools, before every import.
+- The tests replaced the `PYTHONPATH` of the caller instead of adding to it.
+
+---
+
+
 ## [0.4.0] - 2026-11-18
 
 ### Added
