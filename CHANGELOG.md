@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+- On Windows, a script kept inside the directory of a virtual environment was taken for third-party code, so nothing of it was traced without `-v`.
+
 ## [0.4.1] - 2026-11-19
 
 ### Added
