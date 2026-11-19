@@ -608,13 +608,17 @@ class PyftraceBase(ABC):
     def find_site_dirs():
         paths = sysconfig.get_paths()
         dirs = [paths["purelib"], paths["platlib"]]
+        # On Windows the installation directory itself, or that of the
+        # virtual environment, is a site directory.  It holds the standard
+        # library or the scripts of the user, never installed packages.
+        prefixes = PyftraceBase.normalize_dirs(
+            [sys.prefix, sys.exec_prefix, sys.base_prefix,
+             sys.base_exec_prefix])
         if hasattr(site, "getsitepackages"):
-            dirs += site.getsitepackages()
+            dirs += [d for d in site.getsitepackages()
+                     if not set(PyftraceBase.normalize_dirs([d])) & set(prefixes)]
         if hasattr(site, "getusersitepackages"):
             dirs.append(site.getusersitepackages())
-        # On Windows, outside a virtual environment, the installation
-        # directory itself is a site directory.  It holds the standard
-        # library, which must not count as library code.
         stdlib = PyftraceBase.normalize_dirs([paths["stdlib"]])
         site_dirs = PyftraceBase.normalize_dirs(dirs)
         return tuple(d for d in site_dirs

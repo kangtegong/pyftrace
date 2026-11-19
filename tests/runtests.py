@@ -1860,6 +1860,20 @@ class LibraryCodeTests(unittest.TestCase):
             site.getsitepackages = original
         self.assertFalse(tracer.should_trace(os.__file__))
 
+    def test_script_in_environment_directory(self):
+        """
+        On Windows the directory of a virtual environment is a site
+        directory too.  A script kept in it is not library code.
+        """
+        script = os.path.join(sys.prefix, "script.py")
+        original = site.getsitepackages
+        site.getsitepackages = lambda: [sys.prefix]
+        try:
+            tracer = get_tracer()
+        finally:
+            site.getsitepackages = original
+        self.assertFalse(tracer.is_site_code(script))
+
     def test_run_by_import_system(self):
         """
         A finder that a library adds to the import system, and what it
